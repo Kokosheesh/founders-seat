@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Founder's Seat — A grand-strategy simulation for future CEOs</title>
-<meta name="description" content="Run a post-seed startup from a single command dashboard. Hire, fire, raise, pivot, and live with the consequences. Join the waitlist.">
+<meta name="description" content="Run a post-seed startup from a single command dashboard. Hire, fire, raise, pivot, and live with the consequences. Cohort licences for MBA programmes at ₹2,000 per student. Join the waitlist.">
 <meta property="og:title" content="Founder's Seat — Every call is yours.">
 <meta property="og:description" content="A grand-strategy simulation for MBA students, future founders, founder's office and strategy teams. Join the waitlist.">
 <meta property="og:type" content="website">
@@ -172,6 +172,25 @@ p{margin:0}
 .feat b{display:block;font-size:18px;font-weight:500}
 .feat p{font-size:15px;color:var(--body);margin-top:4px;line-height:1.55}
 
+.pricing{padding-block:140px 0;display:flex;flex-direction:column;gap:56px}
+.pricing .intro{display:flex;justify-content:space-between;align-items:flex-end;gap:80px}
+.pricing .intro p{max-width:420px;font-size:18px;line-height:1.6;color:var(--body)}
+.plans{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.plan{padding:40px;border:1px solid var(--line2);background:var(--panel);display:flex;flex-direction:column;gap:20px}
+.plan.hl{border-color:var(--accent)}
+.plan .tier{font-family:var(--mono);font-size:12px;letter-spacing:.16em;color:var(--muted)}
+.plan .price{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.plan .price b{font-family:var(--serif);font-weight:400;font-size:64px;line-height:1;color:var(--ivory)}
+.plan .price span{font-size:15px;color:var(--body)}
+.plan>p{font-size:16px;line-height:1.6;color:var(--body)}
+.plan ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:20px}
+.plan li{font-size:15px;color:var(--ivory);display:flex;gap:12px}
+.plan li::before{content:"—";font-family:var(--mono);color:var(--accent)}
+.plan .btn-ghost{align-self:flex-start;margin-top:auto}
+.plan .btn-solid{align-self:flex-start;margin-top:auto;display:inline-flex;align-items:center;min-height:52px;padding:0 24px;background:var(--accent);color:var(--ink);font-weight:600}
+.plan .btn-solid:hover{background:var(--accent-hi);color:var(--ink)}
+.pricing .note{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--faint)}
+
 .final{padding-block:160px 120px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:32px}
 .final h2{font-size:clamp(52px,6.7vw,96px);line-height:1;letter-spacing:-.02em}
 .final .signup{margin-top:16px;max-width:600px}
@@ -206,6 +225,9 @@ footer .wrap{min-height:96px;display:flex;align-items:center;justify-content:spa
   .grid9{grid-template-columns:repeat(2,minmax(0,1fr))}
   .score{grid-template-columns:1fr;gap:56px;padding-block:96px}
   .schools{grid-template-columns:1fr;gap:40px;padding:48px 40px}
+  .pricing{padding-top:96px}
+  .pricing .intro{flex-direction:column;align-items:flex-start;gap:24px}
+  .plans{grid-template-columns:1fr}
 }
 @media (max-width:600px){
   .nav .wrap{height:64px}
@@ -242,6 +264,9 @@ footer .wrap{min-height:96px;display:flex;align-items:center;justify-content:spa
   .row{flex-direction:column;gap:8px;padding:20px 0}
   .row h3{font-size:26px}
   .schools{padding:32px 24px;gap:28px}
+  .pricing{padding-top:72px;gap:32px}
+  .plan{padding:28px 24px}
+  .plan .price b{font-size:48px}
   .final{padding-block:96px 72px;align-items:stretch;text-align:left}
   footer .wrap{flex-direction:column;align-items:flex-start;justify-content:center;padding-block:28px}
 }
@@ -260,6 +285,7 @@ footer .wrap{min-height:96px;display:flex;align-items:center;justify-content:spa
       <a href="#how">How it plays</a>
       <a href="#scoring">Scoring</a>
       <a href="#schools">For schools</a>
+      <a href="#pricing">Pricing</a>
       <a class="btn-ghost" href="#join">Request a seat</a>
     </nav>
   </div>
@@ -426,6 +452,41 @@ footer .wrap{min-height:96px;display:flex;align-items:center;justify-content:spa
       </div>
     </section>
   </div>
+
+  <section id="pricing" class="wrap pricing">
+    <div class="intro rv">
+      <div style="display:flex;flex-direction:column;gap:20px">
+        <div class="eyebrow">Pricing for programmes</div>
+        <h2 class="h2">Priced per student, per course run.</h2>
+      </div>
+      <p>One licence covers a cohort for a full course run: every student plays the campaign, and faculty get the dashboard and debrief.</p>
+    </div>
+    <div class="plans">
+      <div class="plan hl rv">
+        <span class="tier">FOUNDING PROGRAMME PILOT</span>
+        <div class="price"><b>₹0</b><span>for one cohort</span></div>
+        <p>For the first three MBA programmes in India. Run a full cohort free in exchange for structured feedback and a debrief with your faculty.</p>
+        <ul>
+          <li>Full 36-month campaign for every student</li>
+          <li>Instructor dashboard and decision logs</li>
+          <li>We help design the session plan with your faculty</li>
+        </ul>
+        <a class="btn-solid" href="mailto:kohinoor.mukherjee64@gmail.com?subject=Founder%27s%20Seat%20%E2%80%94%20founding%20programme%20pilot">Apply for a pilot</a>
+      </div>
+      <div class="plan rv">
+        <span class="tier">COHORT LICENCE</span>
+        <div class="price"><b>₹2,000</b><span>per student, per course run</span></div>
+        <p>Minimum 40 seats (₹80,000 per cohort). Billed to the institution once per course run.</p>
+        <ul>
+          <li>Everything in the pilot</li>
+          <li>Cohort leaderboards on a shared scenario and seed</li>
+          <li>End-of-course debrief report per student</li>
+        </ul>
+        <a class="btn-ghost" href="mailto:kohinoor.mukherjee64@gmail.com?subject=Founder%27s%20Seat%20%E2%80%94%20cohort%20licence">Request a quote</a>
+      </div>
+    </div>
+    <p class="note">INDICATIVE LAUNCH PRICING · GST EXTRA</p>
+  </section>
 
   <section id="join" class="wrap final">
     <div class="eyebrow">The waitlist is open</div>
