@@ -195,6 +195,12 @@ p{margin:0}
 .final h2{font-size:clamp(52px,6.7vw,96px);line-height:1;letter-spacing:-.02em}
 .final .signup{margin-top:16px;max-width:600px}
 .final .done{text-align:left}
+.playnow{display:flex;flex-direction:column;align-items:center;gap:14px}
+.playnow .btn{display:inline-flex;align-items:center;gap:12px;height:68px;padding:0 40px;font-size:18px;letter-spacing:.14em;text-decoration:none;color:var(--ink)!important}
+.playnow .btn:hover{color:var(--ink)!important}
+.playnow p{font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--muted)}
+.or{display:flex;align-items:center;gap:16px;width:100%;max-width:600px;font-family:var(--mono);font-size:12px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line2)}
 
 footer{border-top:1px solid var(--line)}
 footer .wrap{min-height:96px;display:flex;align-items:center;justify-content:space-between;gap:16px;font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--muted)}
@@ -268,6 +274,7 @@ footer .wrap{min-height:96px;display:flex;align-items:center;justify-content:spa
   .plan{padding:28px 24px}
   .plan .price b{font-size:48px}
   .final{padding-block:96px 72px;align-items:stretch;text-align:left}
+  .playnow{align-items:stretch}.playnow .btn{justify-content:center}.playnow p{text-align:center}
   footer .wrap{flex-direction:column;align-items:flex-start;justify-content:center;padding-block:28px}
 }
 </style>
@@ -489,8 +496,13 @@ footer .wrap{min-height:96px;display:flex;align-items:center;justify-content:spa
   </section>
 
   <section id="join" class="wrap final">
-    <div class="eyebrow">The waitlist is open</div>
+    <div class="eyebrow">The playable alpha is live</div>
     <h2>The seat is empty. <span class="em">Take it.</span></h2>
+    <div class="playnow">
+      <a class="btn" href="play/" id="play-now">PLAY NOW <svg width="18" height="18" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M2 7h10M8 3l4 4-4 4"/></svg></a>
+      <p>FREE PLAYABLE ALPHA · 36 MONTHS · ONE COMPANY</p>
+    </div>
+    <div class="or">or request a seat for your cohort</div>
     <div class="signup" data-source="footer">
       <form novalidate>
         <fieldset class="roles" style="justify-content:center">
