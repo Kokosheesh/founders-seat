@@ -17,6 +17,9 @@
   function pick(s, arr) { return arr[Math.floor(rng(s) * arr.length)]; }
   function r1(x) { return Math.round(x * 10) / 10; }
   FS.clamp = clamp;
+  function book(s, cat, amt) { s.cash += amt; s.mtx = s.mtx || {}; s.mtx[cat] = (s.mtx[cat] || 0) + amt; }
+  var HK = {}; FS._hooks = HK;
+  function hk(name) { return HK[name] ? HK[name].apply(null, Array.prototype.slice.call(arguments, 1)) : undefined; }
 
   /* ---------- static content ---------- */
   var ARCH = {
@@ -27,28 +30,35 @@
   FS.ARCH = ARCH;
 
   var ROLES = {
-    eng: { title: 'Engineer', fn: 'eng', salary: 22, skill: [0.85, 1.1] },
-    seng: { title: 'Senior Engineer', fn: 'eng', salary: 34, skill: [1.2, 1.45] },
-    em: { title: 'Engineering Manager', fn: 'eng', salary: 45, skill: [0.5, 0.7], em: true },
-    ae: { title: 'Account Executive', fn: 'sales', salary: 18, skill: [0.8, 1.2] },
-    hos: { title: 'Head of Sales', fn: 'sales', salary: 55, skill: [1.0, 1.4], hos: true },
-    csm: { title: 'Customer Success Manager', fn: 'cs', salary: 16, skill: [0.85, 1.15] },
-    mkt: { title: 'Growth Marketer', fn: 'mkt', salary: 20, skill: [0.85, 1.25] }
+    eng: { title: 'Engineer', fn: 'eng', salary: 22, skill: [0.85, 1.1], what: 'Ships roadmap work.' },
+    seng: { title: 'Senior Engineer', fn: 'eng', salary: 34, skill: [1.2, 1.45], what: 'Ships faster; can become a tech lead.' },
+    em: { title: 'Engineering Manager', fn: 'eng', salary: 45, skill: [0.5, 0.7], em: true, what: 'Takes 6 engineers off the CTO\'s plate.' },
+    sre: { title: 'DevOps / SRE', fn: 'eng', salary: 30, skill: [0.9, 1.2], what: 'Fewer outages and faster recovery.' },
+    sec: { title: 'Security Engineer', fn: 'eng', salary: 38, skill: [0.9, 1.25], what: 'Raises security score; halves SOC 2 time.' },
+    pm: { title: 'Product Manager', fn: 'product', salary: 32, skill: [0.85, 1.25], what: 'Better feature impact, +1 experiment slot.' },
+    designer: { title: 'Product Designer', fn: 'product', salary: 20, skill: [0.85, 1.2], what: 'Lifts activation and feature adoption.' },
+    data: { title: 'Data Analyst', fn: 'product', salary: 18, skill: [0.85, 1.2], what: 'Cleaner experiment reads, +1 experiment slot.' },
+    se: { title: 'Sales Executive', fn: 'sales', salary: 9, skill: [0.8, 1.2], what: 'High-volume SMB inside sales. Works ~6.5 deals a month.' },
+    ae: { title: 'Account Executive', fn: 'sales', salary: 18, skill: [0.8, 1.2], what: 'Mid-market and larger deals. Works ~4.5 deals a month, wins more.' },
+    sdr: { title: 'Sales Development Rep', fn: 'sales', salary: 8, skill: [0.8, 1.2], what: 'Books ~3 outbound leads a month.' },
+    hos: { title: 'Head of Sales', fn: 'sales', salary: 55, skill: [1.0, 1.4], hos: true, what: 'Multiplies sales capacity; unlocks Enterprise.' },
+    csm: { title: 'Customer Success Manager', fn: 'cs', salary: 16, skill: [0.85, 1.15], what: 'Handles ~90 tickets a month and keeps accounts healthy.' },
+    support: { title: 'Support Associate', fn: 'cs', salary: 6, skill: [0.85, 1.15], what: 'Handles ~220 tickets a month.' },
+    solutions: { title: 'Solutions Engineer', fn: 'cs', salary: 26, skill: [0.9, 1.25], what: 'Speeds custom enterprise work and wins scoping debates.' },
+    mkt: { title: 'Growth Marketer', fn: 'mkt', salary: 20, skill: [0.85, 1.25], what: 'Better content, referral and event returns.' },
+    perf: { title: 'Performance Marketer', fn: 'mkt', salary: 22, skill: [0.85, 1.25], what: 'Cheaper paid leads; slows ad fatigue.' },
+    pmm: { title: 'Product Marketing Manager', fn: 'mkt', salary: 26, skill: [0.85, 1.25], what: 'Higher win rate and bigger launches.' },
+    fin: { title: 'Finance Manager', fn: 'ops', salary: 18, skill: [0.85, 1.2], what: 'Faster collections, fewer compliance surprises.' },
+    recruiter: { title: 'In-house Recruiter', fn: 'ops', salary: 12, skill: [0.85, 1.2], what: 'Halves recruiter fees; better candidates.' },
+    partner: { title: 'Partnerships Manager', fn: 'ops', salary: 24, skill: [0.85, 1.25], what: 'More partner leads; stronger negotiations.' }
   };
   FS.ROLES = ROLES;
 
   var NAMES = ['Aarav Shah', 'Isha Kapoor', 'Kabir Malik', 'Neha Gupta', 'Rahul Menon', 'Zoya Ahmed', 'Siddharth Rao', 'Tanvi Desai', 'Varun Iyer', 'Pooja Bhat', 'Arnav Sinha', 'Kavya Nair', 'Manav Chopra', 'Riya Sen', 'Yash Agarwal', 'Diya Joshi', 'Harsh Vardhan', 'Meghna Pillai', 'Omkar Patil', 'Sana Qureshi', 'Tejas Kulkarni', 'Nandini Rao', 'Aditi Verma', 'Imran Khan', 'Lakshmi Prasad', 'Rohit Bansal', 'Shreya Ghosh', 'Vivek Anand', 'Anjali Mehra', 'Dhruv Saxena'];
 
-  var ITEMS = {
-    usage: { name: 'Usage-based pricing', effort: 12, why: 'Heavy users pay flat fees today.', ship: 'Expansion revenue rises.' },
-    sso: { name: 'SSO and audit logs', effort: 20, why: 'The price of entry for Enterprise deals.', ship: 'Enterprise segment can now be entered (needs a Head of Sales).' },
-    dispatch: { name: 'Dispatch integration', effort: 24, why: 'Kavya and other logistics accounts want it.', ship: 'Logistics accounts are happier; product-market fit improves.' },
-    billing: { name: 'Billing service refactor', effort: 16, why: 'The source of most incidents.', ship: 'Tech debt drops sharply.' },
-    whatsapp: { name: 'WhatsApp notifications', effort: 6, why: 'Drivers ignore email.', ship: 'Activation and retention improve slightly.' },
-    analytics: { name: 'Analytics dashboard', effort: 14, why: 'Ops heads want proof of savings.', ship: 'Retention improves; fit improves.' },
-    selfserve: { name: 'Self-serve onboarding', effort: 18, why: 'Every deal needs a demo today.', ship: 'Customer acquisition cost falls.' },
-    mobile: { name: 'Native mobile app', effort: 40, why: 'Asked for by three customers.', ship: 'A small lift to fit and acquisition.' }
-  };
+  var ITEMS = {}; // filled by systems.js
+  function item(s, id) { return (s.product.items && s.product.items[id]) || ITEMS[id]; }
+  FS.item = item;
   FS.ITEMS = ITEMS;
 
   var FUNDS = [
@@ -73,7 +83,7 @@
     var arch = ARCH[opts.archetype] ? opts.archetype : 'technical';
     var A = ARCH[arch];
     var s = {
-      v: 1, seed: seed, rng: seed, archetype: arch, month: 1, over: false, outcome: null,
+      v: 2, seed: seed, rng: seed, archetype: arch, month: 1, over: false, outcome: null,
       cash: 420, startCash: 420, raisedTotal: 420,
       segments: {
         blr: { name: 'Bengaluru SMB', tam: 160, arpa: 0.16, cust: 20, unlocked: true },
@@ -100,7 +110,7 @@
         person('nikhil', 'Nikhil Bose', 'eng', 'eng', 'Full-stack Engineer', 20, 0.75, 63),
         person('ananya', 'Ananya Pillai', 'eng', 'eng', 'QA Engineer', 15, 0.85, 72),
         person('kunal', 'Kunal Sethi', 'ae', 'sales', 'Account Executive', 18, 1.0, 70),
-        person('ritu', 'Ritu Tandon', 'ae', 'sales', 'Account Executive', 16, 0.9, 72),
+        person('ritu', 'Ritu Tandon', 'se', 'sales', 'Sales Executive', 9, 0.95, 72),
         person('meera', 'Meera Iyer', 'csm', 'cs', 'Head of Customer Success', 20, 1.1, 74, { key: true }),
         person('kabir', 'Kabir Shah', 'ops', 'ops', 'Operations Lead', 14, 1.0, 72)
       ],
@@ -108,10 +118,10 @@
       product: {
         debt: 45, pmf: 0.55, alloc: 10,
         queue: ['usage', 'sso'], backlog: ['dispatch', 'billing', 'whatsapp', 'analytics', 'selfserve', 'mobile'],
-        progress: { dispatch: 10 }, shipped: [], incidents: []
+        progress: { dispatch: 10 }, shipped: [], shippedAt: {}, incidents: [], items: {}, maint: 0
       },
       marketing: 5, price: 1.0, rent: 3.6, tools: 1.6,
-      mods: { cac: 1, churn: 0, expansion: 0.019, organic: 0.5, sales: 1 },
+      mods: { cac: 1, churn: 0, expansion: 0.019, organic: 1, sales: 1, infra: 1, incident: 1 },
       temp: [],
       board: 60 + A.board, energy: 75, director: false, boardHistory: [],
       focusMax: { str: A.focus.str, ops: A.focus.ops, ppl: A.focus.ppl },
@@ -125,6 +135,7 @@
       scandal: 0, comp: 1.0
     };
     s.people.forEach(function (p) { s.usedNames[p.name] = true; });
+    hk('init', s);
     s.history.push(snapshot(s));
     s.news.push({ m: 1, text: 'You closed a ₹4.2 Cr seed round from Banyan Seed Fund and six angels.' });
     s.news.push({ m: 1, text: 'Stackline, your closest rival, has just raised a $10M Series A.' });
@@ -146,12 +157,14 @@
     var mrr = segMRR(s) + keyMRR(s);
     var cust = customers(s);
     var pay = payroll(s);
-    var infra = 1.4 + 0.03 * cust + (s.segments.ent.cust * 0.15);
+    var x = hk('extra', s, mrr) || { revShare: 0, otherRev: 0, recurring: 0, credits: 0, infraMult: 1, entInfra: 0 };
+    var infraGross = (1.4 + 0.03 * cust + (s.segments.ent.cust * 0.15) + x.entInfra) * (s.mods.infra || 1) * x.infraMult;
+    var infra = infraGross - Math.min(x.credits, infraGross);
     var interest = s.vdebt.taken ? s.vdebt.principal * 0.14 / 12 : 0;
     var repay = (s.vdebt.taken && s.month >= s.vdebt.start + 12 && s.vdebt.principal > 0) ? Math.min(s.vdebt.principal, 150 / 18) : 0;
     var other = s.rent + s.tools;
-    var costs = pay + infra + other + s.marketing + interest;
-    var burn = costs - mrr; // operating net burn (excl. principal)
+    var costs = pay + infra + other + s.marketing + interest + x.revShare + x.recurring;
+    var burn = costs - mrr - x.otherRev; // operating net burn (excl. principal)
     var cashOut = burn + repay;
     var runway = cashOut > 0 ? s.cash / cashOut : Infinity;
     var h = s.history;
@@ -163,20 +176,21 @@
     var churn = s.lastChurn != null ? s.lastChurn : 0.018;
     var nrrM = 1 + s.mods.expansion + tempSum(s, 'expansion') - churn;
     var nrr = Math.pow(nrrM, 12);
-    var gm = mrr > 0 ? (mrr - infra) / mrr : 0;
+    var gm = mrr > 0 ? (mrr + x.otherRev - infra - x.revShare) / (mrr + x.otherRev) : 0;
     var topKey = s.keys.reduce(function (a, k) { return k.active && k.mrr > a ? k.mrr : a; }, 0);
     var conc = mrr > 0 ? topKey / mrr : 0;
     var people = s.people.filter(function (p) { return !p.founder || p.id === 'arjun'; });
     var morale = people.length ? people.reduce(function (a, p) { return a + p.morale; }, 0) / people.length : 70;
     var arpa = cust ? mrr / cust : 0;
-    var cac = cacEff(s);
+    var cac = HK.cac ? HK.cac(s) : cacEff(s);
     var payback = arpa > 0 ? cac / (arpa * Math.max(0.3, gm)) : 99;
     var eng = engineering(s);
     var you = s.cap.you;
     return {
       mrr: mrr, arr: mrr * 12, customers: cust, payroll: pay, infra: infra, interest: interest, repay: repay, other: other,
       marketing: s.marketing, costs: costs, burn: burn, cashOut: cashOut, runway: runway, g3: g3, bm: bm, churn: churn, nrr: nrr,
-      gm: gm, conc: conc, morale: morale, headcount: s.people.length, arpa: arpa, cac: cac, payback: payback, eng: eng, you: you
+      gm: gm, conc: conc, morale: morale, headcount: s.people.length, arpa: arpa, cac: cac, payback: payback, eng: eng, you: you,
+      infraGross: infraGross, credits: infraGross - infra, revShare: x.revShare, otherRev: x.otherRev, recurring: x.recurring
     };
   };
 
@@ -202,13 +216,14 @@
     var engs = staff(s, 'eng');
     var cap = 0, m = 0, n = 0, leads = 0, ems = 0;
     engs.forEach(function (p) {
-      var share = p.role === 'cto' ? 0.5 : (p.role === 'em' ? 0.4 : 1);
+      var share = p.role === 'cto' ? 0.5 : (p.role === 'em' ? 0.4 : p.role === 'sre' ? 0.3 : p.role === 'sec' ? 0.2 : 1);
       cap += 4 * p.skill * share * rampF(p) / (p.role === 'cto' || p.role === 'em' ? p.skill : 1) * (p.role === 'cto' || p.role === 'em' ? 1 : 1);
       m += p.morale; n++;
       if (p.lead) leads++;
       if (p.role === 'em') ems++;
     });
     var ics = engs.filter(function (p) { return p.role !== 'cto' && p.role !== 'em'; }).length;
+    var maint = s.product.maint || 0;
     var reports = ics - leads * 4 - ems * 6;
     var span = reports > 7 ? 1 - 0.03 * (reports - 7) : 1;
     var avgM = n ? m / n : 70;
@@ -216,7 +231,8 @@
     var prod = (1 - s.product.debt / 220) * (0.65 + 0.35 * avgM / 100) * span * A.prod * (1 + tempSum(s, 'prod'));
     var bugTax = s.product.debt / 100 * 0.35;
     var usable = cap * prod * (1 - bugTax);
-    return { raw: cap, prod: prod, bugTax: bugTax, usable: usable, feature: usable * (1 - s.product.alloc / 100), debtWeeks: usable * s.product.alloc / 100, reports: reports, span: span, ics: ics };
+    var feat = Math.max(0, usable * (1 - s.product.alloc / 100) - maint);
+    return { raw: cap, prod: prod, bugTax: bugTax, usable: usable, feature: feat, maint: Math.min(maint, usable * (1 - s.product.alloc / 100)), debtWeeks: usable * s.product.alloc / 100, reports: reports, span: span, ics: ics };
   }
 
   function snapshot(s) {
@@ -237,7 +253,7 @@
     if ((cost.str || 0) > f.str || (cost.ops || 0) > f.ops || (cost.ppl || 0) > f.ppl) return 'Not enough Founder Focus this month.';
     if ((cost.cash || 0) > 0 && cost.cash > s.cash) return 'Not enough cash.';
     f.str -= cost.str || 0; f.ops -= cost.ops || 0; f.ppl -= cost.ppl || 0;
-    s.cash -= cost.cash || 0;
+    if (cost.cash) book(s, cost.cat || 'Other one-offs', -cost.cash);
     s.spentThisMonth = (s.spentThisMonth || 0) + (cost.str || 0) + (cost.ops || 0) + (cost.ppl || 0);
     return null;
   }
@@ -283,7 +299,7 @@
     if (m.runway < 4) return { ok: false, msg: 'Lenders will not lend below 4 months of runway.' };
     var err = spend(s, { str: 1 }); if (err) return { ok: false, msg: err };
     s.vdebt = { taken: true, principal: 150, start: s.month };
-    s.cash += 150;
+    book(s, 'Debt drawn', 150);
     var q = s.fund.status === 'active' || s.fund.raised ? 80 : (m.runway >= 6 && m.runway <= 12 ? 70 : 50);
     logDecision(s, 'Capital', 'Venture debt', 'Drew ₹1.5 Cr at 14%', q, q >= 70 ? 'Debt extended runway while equity was in motion, which is what it is for.' : 'Debt without a plan to raise or reach profit only delays the cliff.');
     news(s, 'You drew ₹1.5 Cr of venture debt at 14% a year.');
@@ -298,7 +314,7 @@
     var pre = Math.max(30, m.arr / 100 * 8) * 100; // in L
     var amt = 150, d = amt / (pre + amt);
     dilute(s, d, 'bridge');
-    s.cash += amt; s.raisedTotal += amt; s.bridge.used = true; s.board -= 4;
+    book(s, 'Equity raised', amt); s.raisedTotal += amt; s.bridge.used = true; s.board -= 4;
     logDecision(s, 'Capital', 'Bridge round', 'Took ₹1.5 Cr from Banyan', m.runway < 4 ? 70 : 55, m.runway < 4 ? 'A bridge from an insider kept the company alive.' : 'A bridge signals weakness to new investors; better used only when needed.');
     news(s, 'Banyan Seed Fund bridged you with ₹1.5 Cr.');
     return { ok: true, msg: 'Bridge closed: ₹1.5 Cr at ' + (d * 100).toFixed(1) + '% dilution.' };
@@ -346,8 +362,9 @@
       return { ok: true, msg: 'Diligence found the inflated ARR. ' + o.fund + ' withdrew the term sheet.' };
     }
     var d = amt / (o.pre + amt);
+    s.fund.dil = d;
     dilute(s, d, 'newInv');
-    s.cash += amt; s.raisedTotal += amt;
+    book(s, 'Equity raised', amt); s.raisedTotal += amt;
     s.fund.status = 'closed'; s.fund.raised = true; s.fund.offer = null; s.fund.closedAt = s.month; s.fund.post = o.pre + amt;
     s.board = Math.min(95, s.board + 14);
     s.flags.seriesA = true;
@@ -380,7 +397,7 @@
     if (!g || g.unlocked) return { ok: false };
     if (p.seg === 'ent' && !(s.product.shipped.indexOf('sso') >= 0 && roleCount(s, 'hos') > 0)) return { ok: false, msg: g.need };
     if (p.seg === 'sea' && !s.fund.raised) return { ok: false, msg: g.need };
-    var err = spend(s, { str: g.str, cash: g.cost }); if (err) return { ok: false, msg: err };
+    var err = spend(s, { str: g.str, cash: g.cost, cat: 'Market entry' }); if (err) return { ok: false, msg: err };
     g.unlocked = true; g.enteredAt = s.month;
     var m = FS.metrics(s);
     var q = p.seg === 'del' ? (roleCount(s, 'ae') >= 3 ? 72 : 55) : p.seg === 'sea' ? (m.runway > 18 ? 65 : 40) : 75;
@@ -408,7 +425,7 @@
     var out = [];
     for (var i = 0; i < 3; i++) {
       var tier = i; // 0 cheap/raw, 1 balanced, 2 premium
-      var skill = R.skill[0] + (R.skill[1] - R.skill[0]) * (0.15 + 0.35 * tier + rng(s) * 0.3);
+      var skill = R.skill[0] + (R.skill[1] - R.skill[0]) * (0.15 + 0.35 * tier + rng(s) * 0.3) + (hk('candBonus', s) || 0);
       var salary = Math.round(R.salary * (0.82 + 0.2 * tier + rng(s) * 0.1));
       var name; var guard = 0;
       do { name = pick(s, NAMES); guard++; } while (s.usedNames[name] && guard < 50);
@@ -417,15 +434,16 @@
     }
     return { ok: true, list: out };
   };
+  FS.hireFee = function (s, c) { return Math.round(c.salary * 0.12 * ARCH[s.archetype].fee * (hk('feeMult', s) || 1) * 10) / 10; };
   ACT.hire = function (s, p) {
     var c = p.cand; var R = ROLES[c.role];
     if (c.role === 'hos' && (roleCount(s, 'hos') > 0 || s.pipeline.some(function (x) { return x.role === 'hos'; }))) return { ok: false, msg: 'You already have a Head of Sales.' };
-    var fee = Math.round(c.salary * 0.12 * ARCH[s.archetype].fee * 10) / 10;
-    var err = spend(s, { ppl: 1, cash: fee }); if (err) return { ok: false, msg: err };
+    var fee = FS.hireFee(s, c);
+    var err = spend(s, { ppl: 1, cash: fee, cat: 'Recruiting fees' }); if (err) return { ok: false, msg: err };
     s.usedNames[c.name] = true;
     s.pipeline.push({ name: c.name, role: c.role, title: c.title, salary: c.salary, skill: c.skill, ramp: c.ramp, arrive: s.month + 1 });
     var m = FS.metrics(s);
-    var revenueRole = ['ae', 'hos', 'csm', 'mkt'].indexOf(c.role) >= 0;
+    var revenueRole = ['ae', 'se', 'sdr', 'hos', 'csm', 'support', 'mkt', 'perf', 'pmm', 'solutions', 'partner'].indexOf(c.role) >= 0;
     var q;
     if (m.runway < 5) q = revenueRole ? 40 : 18;
     else if (m.runway < 8) q = revenueRole ? 62 : 45;
@@ -474,7 +492,7 @@
     var x = findP(s, p.id); if (!x || x.founder) return { ok: false };
     var err = spend(s, { ppl: 1 }); if (err) return { ok: false, msg: err };
     var sev = Math.round(x.salary / 12 * 10) / 10;
-    s.cash -= sev;
+    book(s, 'Severance', -sev);
     s.people = s.people.filter(function (q) { return q.id !== x.id; });
     var low = x.skill < 0.85;
     addTemp(s, 'teamMorale', low ? -3 : -7, 3);
@@ -488,7 +506,7 @@
     return { ok: true, msg: x.name + ' has been let go (severance ₹' + sev + 'L).' };
   };
   ACT.offsite = function (s) {
-    var err = spend(s, { ops: 1, cash: 6 }); if (err) return { ok: false, msg: err };
+    var err = spend(s, { ops: 1, cash: 6, cat: 'Team & culture' }); if (err) return { ok: false, msg: err };
     addTemp(s, 'teamMorale', 6, 3);
     var m = FS.metrics(s);
     logDecision(s, 'Team', 'Culture', 'Ran a team offsite', m.morale < 65 ? 72 : 50, m.morale < 65 ? 'Morale was slipping; a reset was worth ₹6L.' : 'Nice to have; the money had better uses.');
@@ -533,7 +551,7 @@
         apply: function (s) { var P = s.product; P.queue = P.queue.filter(function (x) { return x !== 'dispatch'; }); P.backlog = P.backlog.filter(function (x) { return x !== 'dispatch'; }); P.queue.unshift('dispatch'); s.flags.kavyaDeadline = s.month + 3; },
         q: function (s) { var m = FS.metrics(s); return m.conc > 0.1 ? 78 : 60; }, why: 'With one customer above 10% of MRR, protecting it while the build also serves a segment was sound.' },
       { label: 'Offer a paid services engagement', effect: '+₹6L now; a partner builds it. Renewal is not guaranteed.', cost: { str: 1 },
-        apply: function (s) { s.cash += 6; s.scheduled.push({ m: s.month + 2, fx: 'kavyaServices' }); },
+        apply: function (s) { book(s, 'Services income', 6); s.scheduled.push({ m: s.month + 2, fx: 'kavyaServices' }); },
         q: function () { return 60; }, why: 'Monetising a custom ask is reasonable, but it leaves the renewal to chance.' },
       { label: 'Decline. Protect the roadmap.', effect: 'Roadmap stays on track; team morale +3. High churn risk.', cost: {},
         apply: function (s) { addTemp(s, 'teamMorale', 3, 2); s.scheduled.push({ m: s.month + 1, fx: 'kavyaDecline' }); },
@@ -583,8 +601,8 @@
     body: function () { return 'The billing service fell over during month-end runs. Twelve customers noticed; two have emailed you directly.'; },
     quotes: [['This is the third billing incident this quarter. It will happen again.', 'Vikram Joshi, DevOps']],
     choices: [
-      { label: 'Public post-mortem and service credits', effect: '−₹1.5L credits; trust recovers.', cost: { ops: 1 },
-        apply: function (s) { s.cash -= 1.5; addTemp(s, 'churn', 0.002, 1); },
+      { label: 'Public post-mortem and service credits', effect: '−₹1.5L credits; trust recovers.', cost: { ops: 1, cash: 1.5, cat: 'Crisis costs' },
+        apply: function (s) { addTemp(s, 'churn', 0.002, 1); },
         q: function () { return 75; }, why: 'Owning an outage openly limits churn and builds trust.' },
       { label: 'Fix quietly, say little', effect: 'No cost now. Churn risk rises.', cost: {},
         apply: function (s) { addTemp(s, 'churn', 0.008, 2); },
@@ -635,10 +653,10 @@
     quotes: [['Cash up front is cash up front.', 'Kabir Shah, Ops']],
     choices: [
       { label: 'Accept: ₹5.0L cash today', effect: '+1 customer at a discount; cash now.', cost: {},
-        apply: function (s) { s.cash += 5.0; s.keys.push({ id: 'rajdhani', name: 'Rajdhani Carriers', mrr: 0.42, active: true, prepaid: s.month + 12 }); },
+        apply: function (s) { book(s, 'Customer prepayments', 5.0); s.keys.push({ id: 'rajdhani', name: 'Rajdhani Carriers', mrr: 0.42, active: true, prepaid: s.month + 12 }); },
         q: function (s) { return FS.metrics(s).runway < 10 ? 78 : 62; }, why: 'Prepaid cash is worth a discount when runway is the binding constraint.' },
       { label: 'Counter at 15% off', effect: '60% chance they sign.', cost: { str: 1 },
-        apply: function (s) { if (rng(s) < 0.6) { s.cash += 6.1; s.keys.push({ id: 'rajdhani', name: 'Rajdhani Carriers', mrr: 0.51, active: true }); news(s, 'Rajdhani Carriers signed at 15% off.'); } else news(s, 'Rajdhani Carriers walked away.'); },
+        apply: function (s) { if (rng(s) < 0.6) { book(s, 'Customer prepayments', 6.1); s.keys.push({ id: 'rajdhani', name: 'Rajdhani Carriers', mrr: 0.51, active: true }); news(s, 'Rajdhani Carriers signed at 15% off.'); } else news(s, 'Rajdhani Carriers walked away.'); },
         q: function () { return 70; }, why: 'Negotiating protected price with a fair chance of closing.' },
       { label: 'Decline', effect: 'Protect list price.', cost: {}, apply: function () { }, q: function (s) { return FS.metrics(s).runway < 8 ? 35 : 55; }, why: 'Protecting price is fine, but cash had real value at that runway.' }
     ]
@@ -650,7 +668,7 @@
     body: function () { return 'The GST department has flagged a mismatch in input credits for last year. Kabir thinks it\'s a clerical error.'; },
     quotes: [],
     choices: [
-      { label: 'Hire a CA firm to respond', effect: '−₹3L now.', cost: { ops: 1, cash: 3 }, apply: function () { }, q: function () { return 80; }, why: 'Small, certain cost to close a legal risk.' },
+      { label: 'Hire a CA firm to respond', effect: '−₹3L now.', cost: { ops: 1, cash: 3, cat: 'Legal & compliance' }, apply: function () { }, q: function () { return 80; }, why: 'Small, certain cost to close a legal risk.' },
       { label: 'Let Kabir handle it', effect: 'Free. Might be fine.', cost: {}, apply: function (s) { if (rng(s) < 0.5) s.scheduled.push({ m: s.month + 4, fx: 'gstFine' }); }, q: function () { return 40; }, why: 'Under-resourcing a compliance notice risked a larger fine.' }
     ]
   };
@@ -765,7 +783,7 @@
     body: function () { return 'You can cover payroll this month only by leaving almost nothing for vendors. Kabir suggests delaying salaries by three weeks without telling the team why.'; },
     quotes: [],
     choices: [
-      { label: 'Delay salaries quietly', effect: 'Buys three weeks of cash.', cost: {}, apply: function (s) { s.flags.delayAsked = true; var m = FS.metrics(s); s.cash += m.payroll * 0.75; addTemp(s, 'teamMorale', -15, 3); s.scandal++; s.scheduled.push({ m: s.month + 1, fx: 'payback', data: m.payroll * 0.75 }); }, q: function () { return 10; }, why: 'Delaying pay without candour breaks the deepest trust in a company.' },
+      { label: 'Delay salaries quietly', effect: 'Buys three weeks of cash.', cost: {}, apply: function (s) { s.flags.delayAsked = true; var m = FS.metrics(s); book(s, 'Deferred salaries', m.payroll * 0.75); addTemp(s, 'teamMorale', -15, 3); s.scandal++; s.scheduled.push({ m: s.month + 1, fx: 'payback', data: m.payroll * 0.75 }); }, q: function () { return 10; }, why: 'Delaying pay without candour breaks the deepest trust in a company.' },
       { label: 'Tell the team the truth and cut founder pay', effect: 'Founder salaries go to zero; morale dips less.', cost: { ppl: 1 }, apply: function (s) { s.flags.delayAsked = true; s.people.forEach(function (p) { if (p.founder) p.salary = 0; }); addTemp(s, 'teamMorale', -4, 2); }, q: function () { return 85; }, why: 'Leaders absorbing the pain first is what keeps teams in a crisis.' }
     ]
   };
@@ -784,10 +802,10 @@
     kavyaServices: function (s) { if (rng(s) < 0.5) churnKey(s, 'kavya'); else news(s, 'Kavya Logistics renewed after the services engagement.'); },
     kavyaDecline: function (s) { if (rng(s) < 0.8) churnKey(s, 'kavya'); else news(s, 'Kavya Logistics renewed anyway, grudgingly.'); },
     rohanMaybe: function (s) { if (rng(s) < 0.4) { leave(s, 'rohan', true); s.product.debt = Math.min(100, s.product.debt + 6); } },
-    gstFine: function (s) { s.cash -= 15; news(s, 'GST demand of ₹15L including penalties is upheld.'); logDecision(s, 'Compliance', 'GST', 'The unanswered notice became a ₹15L demand', 20, 'A ₹3L response would have avoided a ₹15L fine.'); },
-    mistake: function (s) { s.cash -= 8; news(s, 'An exhausted sign-off on a vendor contract cost ₹8L.'); },
+    gstFine: function (s) { book(s, 'Legal & compliance', -15); news(s, 'GST demand of ₹15L including penalties is upheld.'); logDecision(s, 'Compliance', 'GST', 'The unanswered notice became a ₹15L demand', 20, 'A ₹3L response would have avoided a ₹15L fine.'); },
+    mistake: function (s) { book(s, 'Other one-offs', -8); news(s, 'An exhausted sign-off on a vendor contract cost ₹8L.'); },
     snehaLeaves: function (s) { if (rng(s) < 0.8) leave(s, 'sneha', false); },
-    payback: function (s, d) { s.cash -= d; }
+    payback: function (s, d) { book(s, 'Deferred salaries', -d); }
   };
 
   function weightOf(e, s) { return typeof e.w === 'function' ? e.w(s) : e.w; }
@@ -801,35 +819,41 @@
     }
     if (s.pending.length) return;
     var pool = [];
+    // crises are rolled separately (systems.js)
     for (var id in EV) {
       var e = EV[id];
+      if (e.crisis || e.sys) continue;
       if (e.once && s.fired[id]) continue;
       if (!e.once && s.fired[id] && s.fired[id] >= s.month - 3) continue;
       if (!e.when(s)) continue;
       var w = weightOf(e, s); if (w > 0) pool.push([id, w]);
     }
-    var chance = s.month <= 2 ? 0.3 : 0.62;
+    var chance = s.month <= 2 ? 0.3 : 0.55;
     if (!pool.length || rng(s) > chance) return;
     var tot = pool.reduce(function (a, x) { return a + x[1]; }, 0), r = rng(s) * tot;
-    for (var i = 0; i < pool.length; i++) { r -= pool[i][1]; if (r <= 0) { s.pending.push(pool[i][0]); return; } }
+    for (var i = 0; i < pool.length; i++) { r -= pool[i][1]; if (r <= 0) { s.pending.push(pool[i][0]); break; } }
   }
+  function rollAll(s) { rollEvents(s); var c = hk('crisis', s); if (c && s.pending.indexOf(c) < 0) s.pending.push(c); }
 
   FS.currentEvent = function (s) {
     if (!s.pending.length) return null;
     var id = s.pending[0], e = EV[id];
-    return { id: id, title: e.title, tag: e.tag, body: e.body(s), quotes: e.quotes || [], choices: e.choices.map(function (c) { return { label: c.label, effect: c.effect, cost: c.cost || {} }; }) };
+    var ch = typeof e.choices === 'function' ? e.choices(s) : e.choices;
+    return { id: id, title: typeof e.title === 'function' ? e.title(s) : e.title, tag: e.tag, crisis: !!e.crisis, body: e.body(s), quotes: e.quotes || [], choices: ch.map(function (c) { return { label: c.label, effect: c.effect, cost: (typeof c.cost === 'function' ? c.cost(s) : c.cost) || {} }; }) };
   };
 
   FS.resolveEvent = function (s, idx) {
     var id = s.pending[0]; if (!id) return { ok: false };
-    var e = EV[id], c = e.choices[idx];
-    var err = spend(s, c.cost || {});
+    var e = EV[id], ch = typeof e.choices === 'function' ? e.choices(s) : e.choices, c = ch[idx];
+    var err = spend(s, (typeof c.cost === 'function' ? c.cost(s) : c.cost) || {});
     if (err) return { ok: false, msg: err };
     var q = c.q(s);
+    var title = typeof e.title === 'function' ? e.title(s) : e.title;
     c.apply(s);
     s.fired[id] = s.month;
     s.pending.shift();
-    logDecision(s, 'Event', e.title, c.label, q, c.why);
+    logDecision(s, e.crisis ? 'Crisis' : 'Event', title, c.label, q, c.why);
+    if (e.crisis) { s.crises = s.crises || []; s.crises.unshift({ m: s.month, title: title, choice: c.label, tag: e.tag }); }
     return { ok: true };
   };
 
@@ -853,10 +877,12 @@
     if (P.progress.__tax) { var t = Math.min(fw, P.progress.__tax); fw -= t; P.progress.__tax -= t; }
     var guard = 0;
     while (fw > 0.01 && P.queue.length && guard++ < 10) {
-      var id = P.queue[0], need = ITEMS[id].effort - (P.progress[id] || 0);
+      var id = P.queue[0], it = item(s, id);
+      if (!it) { P.queue.shift(); continue; }
+      var need = it.effort - (P.progress[id] || 0);
       var put = Math.min(need, fw);
       P.progress[id] = (P.progress[id] || 0) + put; fw -= put;
-      if (P.progress[id] >= ITEMS[id].effort - 0.01) { P.queue.shift(); P.shipped.push(id); shipFx(s, id); rep.shipped.push(ITEMS[id].name); news(s, 'Shipped: ' + ITEMS[id].name + '.'); }
+      if (P.progress[id] >= it.effort - 0.01) { P.queue.shift(); P.shipped.push(id); P.shippedAt[id] = s.month; rep.shipped.push(it.name); news(s, 'Shipped: ' + it.name + '.'); hk('ship', s, id, rep); }
     }
     if (fw > 1 && !P.queue.length) rep.notes.push(Math.round(fw) + ' engineering weeks went unused: the roadmap queue was empty.');
     P.debt = clamp(P.debt + 1.0 + e.feature * 0.05 - e.debtWeeks * 0.4, 8, 100);
@@ -867,8 +893,8 @@
     var m = FS.metrics(s);
     var cs = staff(s, 'cs').reduce(function (a, p) { return a + p.skill * rampF(p); }, 0);
     var cover = cs * 30 / Math.max(1, m.customers);
-    var churn = 0.017 - 0.002 * Math.min(cs, 5) + Math.max(0, (P.debt - 30)) / 100 * 0.015 + Math.max(0, 1 - cover) * 0.01 + (0.6 - P.pmf) * 0.02 + s.mods.churn + tempSum(s, 'churn');
-    churn = clamp(churn, 0.004, 0.08);
+    var churn = 0.017 - 0.0015 * Math.min(cs, 3) + Math.max(0, (P.debt - 30)) / 100 * 0.015 + (HK.supportChurn ? HK.supportChurn(s, m) : Math.max(0, 1 - cover) * 0.01) + (0.6 - P.pmf) * 0.015 + s.mods.churn + tempSum(s, 'churn');
+    churn = clamp(churn, 0.01, 0.08);
     s.lastChurn = churn;
     var churned = 0;
     for (var k in s.segments) { var g = s.segments[k]; var c = sround(s, g.cust * churn); g.cust -= c; churned += c; }
@@ -878,24 +904,13 @@
     for (k in s.segments) { var sg = s.segments[k]; sg.base = sg.base || sg.arpa; sg.arpa *= (1 + exp * Math.pow(sg.base / sg.arpa, 2.5)); }
     s.keys.forEach(function (kk) { if (kk.active) kk.mrr *= (1 + exp * 0.5); });
     // acquisition
-    var aes = s.people.filter(function (p) { return p.role === 'ae'; });
-    var hos = s.people.filter(function (p) { return p.role === 'hos'; })[0];
-    var salesCap = aes.reduce(function (a, p) { return a + 2.6 * p.skill * rampF(p); }, 0) * (hos ? 1 + 0.3 * hos.skill * rampF(hos) : 1) * s.mods.sales;
-    var cac = cacEff(s);
-    var paid = Math.min(salesCap, s.marketing / cac);
-    var organic = s.mods.organic * P.pmf * 1.8 + (s.flags.reseller > s.month ? 2 : 0);
-    var demand = paid + organic;
-    var segs = Object.keys(s.segments).filter(function (k) { return s.segments[k].unlocked && k !== 'ent'; });
-    var wsum = 0, ws = {};
-    segs.forEach(function (k) { var g = s.segments[k]; var left = Math.max(0, g.tam - g.cust); var conv = Math.pow(Math.max(0, 1 - g.cust / g.tam), 1.3); var w = left * conv * (k === 'del' ? 0.45 : 1); ws[k] = w; wsum += w; });
-    var added = 0;
-    segs.forEach(function (k) { if (wsum <= 0) return; var n = sround(s, demand * ws[k] / wsum * (k === 'del' ? 0.6 : 1)); n = Math.min(n, s.segments[k].tam - s.segments[k].cust); s.segments[k].cust += n; added += n; });
-    if (s.segments.ent.unlocked && hos) { var en = sround(s, 0.3 * hos.skill * rampF(hos)); en = Math.min(en, s.segments.ent.tam - s.segments.ent.cust); s.segments.ent.cust += en; added += en; }
+    var added = hk('acquire', s, rep) || 0;
     rep.newCust = added;
-    s.lastCac = cac;
 
     // 3. money
     m = FS.metrics(s);
+    rep._m = m;
+    hk('money', s, rep, m);
     s.cash -= m.cashOut;
     if (m.repay > 0) s.vdebt.principal = Math.max(0, s.vdebt.principal - m.repay);
 
@@ -945,6 +960,7 @@
 
     // 6. fundraise progress
     fundraiseTick(s, rep);
+    hk('postTick', s, rep);
 
     // scheduled effects
     s.scheduled = s.scheduled.filter(function (x) { if (x.m <= s.month) { FX[x.fx](s, x.data); return false; } return true; });
@@ -956,7 +972,8 @@
     rep.news = s.news.filter(function (n) { return n.m === s.month; }).map(function (n) { return n.text; });
 
     // board meeting at end of each quarter
-    if (s.month % 3 === 0) rep.boardMeeting = boardMeeting(s);
+    if (s.month % 3 === 0) { rep.boardMeeting = boardMeeting(s); hk('board', s, rep.boardMeeting); }
+    hk('close', s, rep);
 
     // advance
     s.month++;
@@ -973,7 +990,7 @@
     }
     if (!s.over && s.board < 12) { s.over = true; s.outcome = 'fired'; }
     if (!s.over && s.month > 36) { s.over = true; s.outcome = 'completed'; s.month = 36; }
-    if (!s.over) rollEvents(s);
+    if (!s.over) rollAll(s);
     return rep;
   };
 
@@ -996,7 +1013,7 @@
     return sc;
   }
   FS.fundInterest = function (s, f) {
-    var base = metricsScore(s) + f.fit * 0.03 + (s.fund.pitched[f.id] || 0) * 0.045 + ARCH[s.archetype].interest + (s.fund.inflated ? 0.06 : 0) + (s.director ? 0.02 : 0);
+    var base = metricsScore(s) + f.fit * 0.03 + (s.fund.pitched[f.id] || 0) * 0.045 + ARCH[s.archetype].interest + (s.fund.inflated ? 0.06 : 0) + (s.director ? 0.02 : 0) + (s.flags.dataroom ? 0.03 : 0);
     return base;
   };
 
@@ -1065,9 +1082,12 @@
       eff: eff, effGrade: grade(eff, [1.0, 0.6, 0.35, 0.15]),
       team: team, teamGrade: grade(team, [75, 65, 55, 45]),
       rep: rep, repGrade: grade(rep, [85, 70, 50, 30]),
-      outcome: s.outcome, months: s.history.length - 1
+      outcome: s.outcome, months: s.history.length - 1,
+      goals: HK.goalsDone ? HK.goalsDone(s) : 0, goalsTotal: HK.goalsTotal ? HK.goalsTotal() : 0
     };
   };
 
+  FS._ACT = ACT; FS._EV = EV; FS._FX = FX;
+  FS._h = { rng: rng, clamp: clamp, sround: sround, pick: pick, r1: r1, book: book, news: news, logDecision: logDecision, addTemp: addTemp, spend: spend, findP: findP, staff: staff, rampF: rampF, engineering: engineering, person: person, leave: leave, churnKey: churnKey, dilute: dilute, NAMES: NAMES, keyActive: keyActive, snapshot: snapshot };
   root.FS = FS;
 })(typeof window !== 'undefined' ? window : globalThis);
