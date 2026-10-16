@@ -238,6 +238,57 @@ input[type=text]:focus{outline:none;border-color:var(--accent)}
   .head h1{font-size:28px}
   .modal h2{font-size:28px}
 }
+
+/* v2 additions */
+.eyebrow.down{color:var(--down)}.eyebrow.up{color:var(--up)}
+.rows .v{white-space:nowrap}
+.chtab td,.chtab th{padding:7px 10px}
+.chtab .fat{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.lbtns{display:flex;gap:6px;flex-wrap:wrap}
+.linkb{background:none;border:0;padding:0;color:var(--accent);font-family:var(--mono);font-size:10px;letter-spacing:.08em;cursor:pointer}
+.linkb:hover{color:var(--accent-hi)}
+.card.crisis{border-color:var(--down)}
+.modal.crisis{border-color:var(--down);box-shadow:0 0 0 1px var(--down),0 40px 120px rgba(0,0,0,.7)}
+.modal.crisis h2{color:#F2C5BB}
+.tscroll{overflow-x:auto;max-width:100%}
+.chtab td,.chtab th{vertical-align:middle}
+.chtab td:first-child{white-space:normal;min-width:200px;max-width:280px}
+.chtab .note{font-size:11px}
+.stepper.sm{gap:4px}.stepper.sm .val{min-width:58px;font-size:12px}
+.btn.icon2{min-width:32px;padding:0 8px}
+.funnel{display:flex;flex-direction:column;gap:12px}
+.funnel .fs{display:flex;flex-direction:column;gap:4px}
+.funnel .fl{display:flex;justify-content:space-between;font-size:13px}
+.opts{display:flex;flex-direction:column}
+.opt{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.opt.cur{background:var(--hi);box-shadow:inset 2px 0 0 var(--accent)}
+.lrow .k{color:var(--body)}
+table.report td,table.report th{padding:6px 12px}
+table.report td:first-child{min-width:240px;white-space:normal}
+table.report tr.secrow td{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--muted);background:var(--raised);padding-top:10px}
+table.report tr.subrow td{color:var(--muted);font-size:11px}
+table.report td.neg{color:#E8B3A8}
+table.report td.tot{background:var(--raised);color:var(--ivory)}
+.statrow.s5{grid-template-columns:repeat(5,minmax(0,1fr))}
+.acct{padding:10px 18px 14px;display:flex;flex-direction:column;gap:3px;border-top:1px solid var(--line)}
+.acct .em2{font-size:12px;color:var(--body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct button{min-height:28px!important;padding:0!important;color:var(--accent)!important;font-size:12px!important}
+.authgrid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:40px;align-items:start}
+.authcard{border:1px solid var(--line2);background:var(--panel);padding:22px;display:flex;flex-direction:column;gap:14px}
+.authcard .seg{display:flex}.authcard .seg button{flex:1}
+.authcard label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--body)}
+.authcard input{height:44px;padding:0 12px;background:var(--raised);border:1px solid var(--line2);color:var(--ivory);font-family:var(--sans);font-size:15px;width:100%}
+.authcard input:focus{outline:none;border-color:var(--accent)}
+.authcard .linkb{align-self:flex-start;font-size:11px;letter-spacing:.02em}
+@media (max-width:1100px){.kpis .kpi:nth-child(3){border-right:0}}
+@media (max-width:820px){
+  .authgrid{grid-template-columns:1fr}
+  .seg{display:flex;flex-wrap:wrap;max-width:100%}.seg button{flex:1 1 auto;border-bottom:1px solid var(--line2)}
+  .statrow.s5{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .rail .acct{display:none}
+  .chtab td:first-child{min-width:150px}
+  table.report td:first-child{min-width:170px}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -270,6 +321,9 @@ input[type=text]:focus{outline:none;border-color:var(--accent)}
 <div id="modalRoot"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="engine.js"></script>
+<script src="systems.js"></script>
+<script src="auth.js"></script>
 <script src="ui.js"></script>
+<script src="ui2.js"></script>
 </body>
 </html>
