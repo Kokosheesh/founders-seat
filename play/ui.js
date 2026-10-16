@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   var FS = window.FS;
-  var SAVE = 'fs_game_v1';
+  var SAVE = 'fs_game_v2';
   var S = null, view = 'overview', selPerson = null, modalQ = [], pickedArch = 'technical';
   var $ = function (id) { return document.getElementById(id); };
 
@@ -17,7 +17,7 @@
   function pct(x, dp) { return (x * 100).toFixed(dp == null ? 1 : dp) + '%'; }
   function mm(n) { return (n < 10 ? '0' : '') + n; }
   function save() { try { localStorage.setItem(SAVE, JSON.stringify(S)); } catch (e) { } }
-  function load() { try { var j = localStorage.getItem(SAVE); return j ? JSON.parse(j) : null; } catch (e) { return null; } }
+  function load() { try { var j = localStorage.getItem(SAVE); var o = j ? JSON.parse(j) : null; return o && o.v === 2 ? o : null; } catch (e) { return null; } }
   function clearSave() { try { localStorage.removeItem(SAVE); } catch (e) { } }
   function toast(msg, err) {
     if (!msg) return;
@@ -78,13 +78,16 @@
     $('endMonth').disabled = S.over;
   }
 
-  var VIEWS = [['overview', 'Overview'], ['finance', 'Finance'], ['product', 'Product'], ['team', 'Team & Org'], ['capital', 'Capital & Board']];
+  var VIEWS = [['overview', 'Overview'], ['finance', 'Finance'], ['growth', 'Growth'], ['product', 'Product'], ['team', 'Team & Org'], ['ops', 'Operations'], ['partners', 'Partners & Deals'], ['capital', 'Capital & Board'], ['reports', 'Reports'], ['goals', 'Goals']];
   function renderNav(m) {
     var flags = {
       finance: m.runway < 6 ? '!' : '',
       product: S.product.queue.length ? '' : '!',
       team: (function () { var n = S.people.filter(function (p) { return !p.founder && p.morale < 50; }).length; return n ? String(n) : ''; })(),
-      capital: S.fund.offer ? '•' : (m.runway < 9 && S.fund.status === 'none' ? '!' : '')
+      capital: S.fund.offer ? '•' : (m.runway < 9 && S.fund.status === 'none' ? '!' : ''),
+      growth: S.exp.ready.length ? String(S.exp.ready.length) : '',
+      partners: S.partners.offers.length + (S.deals.offer ? 1 : 0) ? '•' : '',
+      ops: FS.support(S).sla < 0.9 ? '!' : ''
     };
     $('nav').innerHTML = VIEWS.map(function (v) {
       return '<button type="button" data-act="view" data-v="' + v[0] + '"' + (view === v[0] ? ' aria-current="page"' : '') + '><span>' + v[1] + '</span><span class="flag">' + (flags[v[0]] || '') + '</span></button>';
@@ -122,12 +125,16 @@
     if (!S.product.queue.length) a.push(['The roadmap queue is empty: engineers are idle', 'product', '#E08B7C']);
     if (S.product.debt > 60) a.push(['Tech debt is slowing the team', 'product', '#C9A45C']);
     if (e.reports > 8) a.push(['Arjun has ' + e.reports + ' direct reports', 'team', '#C9A45C']);
-    var cs = S.people.filter(function (p) { return p.fn === 'cs'; }).length;
-    if (m.customers / Math.max(1, cs) > 32) a.push(['Customer success is stretched: ' + Math.round(m.customers / Math.max(1, cs)) + ' accounts per person', 'team', '#C9A45C']);
-    if (si.bottleneck === 'sales' && si.leads - si.cap > 1) a.push(['Leads are piling up: hire sales capacity', 'team', '#C9A45C']);
-    if (si.bottleneck === 'marketing' && si.cap - si.leads > 1.5) a.push(['Sales has spare capacity: raise the marketing budget', 'finance', '#8E959E']);
+    if (S.pending.length) a.unshift(['An event needs your decision', 'overview', '#E08B7C']);
+    if (S.deals.offer) a.push(['RFP from ' + S.deals.offer.name + ' (₹' + S.deals.offer.mrr.toFixed(1) + 'L MRR) is waiting', 'partners', '#C9A45C']);
+    if (S.partners.offers.length) a.push([FS.PARTNERS[S.partners.offers[0].id].name + ' sent a partnership proposal', 'partners', '#C9A45C']);
+    if (S.exp.ready.length) a.push([S.exp.ready.length + ' experiment result' + (S.exp.ready.length > 1 ? 's' : '') + ' to decide on', 'growth', '#C9A45C']);
+    if (si.A.bottleneck === 'sales' && si.A.salesOpps - si.A.cap > 1) a.push(['Deals are piling up: hire Sales Executives or AEs', 'team', '#C9A45C']);
+    if (si.A.bottleneck !== 'sales' && si.A.cap - si.A.salesOpps > 3) a.push(['Sales has spare capacity: invest in channels', 'growth', '#8E959E']);
+    var sup = FS.support(S); if (sup.sla < 0.9) a.push(['Support is overloaded: SLA at ' + Math.round(sup.sla * 100) + '%', 'ops', '#E08B7C']);
+    if (FS.launchable(S).length) a.push(['A shipped feature is ready to launch', 'product', '#8E959E']);
     if (m.g3 < 0.04 && S.month > 4) a.push(['Growth is ' + pct(m.g3) + ' a month', 'overview', '#E08B7C']);
-    return a.slice(0, 6);
+    return a.slice(0, 7);
   }
 
   function vOverview(m) {
@@ -158,9 +165,23 @@
       '<section class="card"><div class="ch"><span class="eyebrow">Company</span></div><div class="rows">' +
       [['Customers', m.customers], ['Avg revenue / account', L(m.arpa, 2) + '/mo'], ['Monthly logo churn', pct(m.churn)], ['Net revenue retention', Math.round(m.nrr * 100) + '%'], ['3-month growth', S.history.length > 1 ? pct(m.g3) + '/mo' : '—'], ['Largest customer', Math.round(m.conc * 100) + '% of MRR']].map(function (r) { return '<div><span class="k">' + r[0] + '</span><span class="v">' + esc(r[1]) + '</span></div>'; }).join('') +
       '</div></section>' +
+      goalsCard() + crisisCard() +
       '<section class="card"><div class="ch"><span class="eyebrow">Key accounts</span></div><div class="rows">' + keys.map(function (k) { return '<div><span class="k">' + esc(k.name) + '</span><span class="v">' + L(k.mrr, 2) + ' · ' + Math.round(k.mrr / m.mrr * 100) + '%</span></div>'; }).join('') + '</div></section>' +
       '<section class="card"><div class="ch"><span class="eyebrow">Market feed</span></div><div class="feed">' + S.news.slice(0, 6).map(function (n) { return '<div><span class="w">MONTH ' + mm(n.m) + '</span><span class="x">' + esc(n.text) + '</span></div>'; }).join('') + '</div></section>' +
       '</aside></div>';
+  }
+
+  function goalsCard() {
+    var ng = FS.nextGoals(S), done = Object.keys(S.goals).length;
+    var okr = S.okrs.length ? '<div class="fnh">BOARD TARGETS FOR THIS QUARTER</div><div class="rows">' + S.okrs.map(function (o) { var ok = FS.okrMet(S, o); return '<div><span class="k">' + esc(o.label) + '</span><span class="v ' + (ok ? 'up' : 'mut') + '">' + (ok ? 'ON TRACK' : 'OPEN') + '</span></div>'; }).join('') + '</div>' : '';
+    return '<section class="card"><div class="ch"><span class="eyebrow">Next milestones</span><button type="button" class="linkb" data-act="view" data-v="goals">' + done + ' / ' + FS.GOALS.length + ' DONE</button></div><div class="rows">' +
+      ng.map(function (g) { return '<div><span class="k">' + esc(g.name) + '</span><span class="v faint" style="font-size:10px">' + esc(g.ch.toUpperCase()) + '</span></div>'; }).join('') + '</div>' + okr + '</section>';
+  }
+  function crisisCard() {
+    var c = (S.crises || []).filter(function (x) { return x.m >= S.month - 4; });
+    var sec = FS.secScore(S), sup = FS.support(S);
+    return '<section class="card' + (c.length ? ' crisis' : '') + '"><div class="ch"><span class="eyebrow' + (c.length ? ' down' : '') + '">Crisis room</span><span class="mono faint" style="font-size:10px">SECURITY ' + Math.round(sec) + ' · SLA ' + Math.round(sup.sla * 100) + '%</span></div>' +
+      (c.length ? c.slice(0, 3).map(function (x) { return '<div class="alert"><span class="lv down">M' + mm(x.m) + '</span><span><b style="font-weight:500">' + esc(x.title) + '</b><br><span class="note">' + esc(x.tag) + ' · ' + esc(x.choice) + '</span></span></div>'; }).join('') : '<p class="cb note">No crises in the last four months. Tech debt, weak security and heavy paid spend all raise the odds.</p>') + '</section>';
   }
 
   function vFinance(m) {
@@ -176,6 +197,7 @@
       var tone = d === '' || Math.abs(d) < 0.05 ? 'mut' : ((d > 0) !== !!inv ? 'up' : 'down');
       return '<tr class="' + (strong ? 'strong' : '') + '"><td>' + label + '</td><td>' + a.toFixed(1) + '</td><td class="mut">' + (b == null ? '—' : b.toFixed(1)) + '</td><td class="' + tone + '">' + (d === '' ? '—' : (d >= 0 ? '+' : '−') + Math.abs(d).toFixed(1)) + '</td></tr>';
     };
+    var dsoTxt = 'Receivables ' + L(S.ar) + ' · ' + Math.round(FS.dso(S)) + ' days to collect';
     var debtTxt = S.vdebt.taken ? 'Drawn: ' + L(S.vdebt.principal) + ' outstanding at 14%.' : 'Lenders offer ₹1.5 Cr at 14%, repaid over 18 months after a 12-month holiday. Needs ₹90L ARR and 4+ months of runway.';
     return '<div class="head"><div><div class="eyebrow acc">Finance</div><h1>' + (zero ? 'On current burn, cash runs out in <span class="em">month ' + zero.toFixed(1) + '.</span>' : 'Cash-flow positive. <span class="em">Every rupee is now a choice.</span>') + '</h1></div></div>' +
       '<div class="kpis">' +
@@ -185,49 +207,66 @@
       '<section class="card"><div class="ch"><span class="eyebrow">Cash · ₹ Cr · actual and projected at today\'s burn</span></div><div class="cb">' +
       lineChart([{ pts: proj, color: '#ECE6DA', dash: '6 4' }, { pts: cashPts, color: '#C9A45C', dot: true }], { h: 210, now: S.month, fmt: function (v) { return v.toFixed(1); }, label: 'Cash balance by month with projection' }) + '</div></section>' +
       '<section class="card"><div class="ch"><span class="eyebrow">P&amp;L · ₹ lakh · this month</span><span class="mono faint" style="font-size:10px">VS LAST MONTH</span></div><table><thead><tr><th>Line</th><th>M' + mm(S.month) + '</th><th>M' + mm(Math.max(1, S.month - 1)) + '</th><th>Change</th></tr></thead><tbody>' +
-      row('Revenue (MRR)', m.mrr, prev && prev.mrr, true) + row('Payroll (' + m.headcount + ' people)', m.payroll, prev && prev.payroll, false, true) + row('Infrastructure', m.infra, prev && prev.infra, false, true) + row('Rent and tools', m.other, prev && prev.other, false, true) + row('Marketing', m.marketing, prev && prev.mkt, false, true) + (m.interest ? row('Debt interest', m.interest, prev && prev.interest, false, true) : '') + row('Net burn', -m.burn, prev ? -prev.burn : null, true) +
-      '</tbody></table></section></div>' +
+      row('Revenue (MRR)', m.mrr, prev && prev.mrr, true) + row('Payroll (' + m.headcount + ' people)', m.payroll, prev && prev.payroll, false, true) + row('Infrastructure', m.infra, prev && prev.infra, false, true) + row('Rent and tools', m.other, prev && prev.other, false, true) + row('Growth spend', m.marketing, prev && prev.mkt, false, true) + (m.revShare ? row('Partner revenue share', m.revShare, null, false, true) : '') + (m.otherRev ? row('Payments income', m.otherRev, null) : '') + (m.interest ? row('Debt interest', m.interest, prev && prev.interest, false, true) : '') + row('Net burn', -m.burn, prev ? -prev.burn : null, true) +
+      '</tbody></table><p class="cb note">' + dsoTxt + (S.credits > 0 ? ' · Cloud credits left ' + L(S.credits) : '') + '. Full P&amp;L, cash flow and MIS are in Reports.</p></section></div>' +
       '<aside class="grid" style="align-content:start">' +
-      '<section class="card hl"><div class="ch"><span class="eyebrow acc">Marketing budget</span><span class="mono" style="font-size:12px">' + L(S.marketing) + '/mo</span></div><div class="cb" style="display:flex;flex-direction:column;gap:12px">' +
-      '<div class="stepper">' + btn('−1L', 'mkt', { d: -1 }, { cls: 'sm', disabled: S.marketing <= 0 }) + '<span class="val">' + L(S.marketing) + '</span>' + btn('+1L', 'mkt', { d: 1 }, { cls: 'sm', disabled: S.marketing >= 25 }) + btn('+5L', 'mkt', { d: 5 }, { cls: 'sm', disabled: S.marketing >= 25 }) + '</div>' +
-      '<p class="note">Buys ~' + si.leads.toFixed(1) + ' qualified deals a month at ' + L(si.cac) + ' CAC. Your sales team can close ~' + si.cap.toFixed(1) + '. <b class="' + (si.bottleneck === 'sales' ? 'down' : 'acc') + '">Bottleneck: ' + si.bottleneck + '.</b></p></div></section>' +
+      '<section class="card hl"><div class="ch"><span class="eyebrow acc">Growth spend</span><span class="mono" style="font-size:12px">' + L(S.marketing) + '/mo</span></div><div class="cb" style="display:flex;flex-direction:column;gap:12px">' +
+      '<p class="note">Spread across ' + FS.CH_ORDER.filter(function (c) { return S.channels[c] > 0; }).length + ' channels. Last month it bought ' + ((S.lastAcq && S.lastAcq.leads) || si.A.leads).toFixed(0) + ' leads and ' + ((S.lastAcq && S.lastAcq.cust) || 0) + ' new customers. <b class="' + (si.bottleneck === 'sales' ? 'down' : 'acc') + '">Bottleneck: ' + si.bottleneck + '.</b></p>' +
+      btn('Open Growth to change spend', 'view', { v: 'growth' }, { cls: 'sm ghost' }) + '</div></section>' +
       '<section class="card"><div class="ch"><span class="eyebrow">Unit economics</span></div><div class="rows">' +
-      [['CAC', L(m.cac)], ['Avg revenue / account', L(m.arpa, 2) + '/mo'], ['CAC payback', m.payback > 60 ? '—' : m.payback.toFixed(1) + ' mo'], ['Logo churn', pct(m.churn) + '/mo'], ['NRR (annualised)', Math.round(m.nrr * 100) + '%']].map(function (r) { return '<div><span class="k">' + r[0] + '</span><span class="v">' + r[1] + '</span></div>'; }).join('') + '</div></section>' +
+      [['CAC (programmes)', L(m.cac)], ['Avg revenue / account', L(m.arpa, 2) + '/mo'], ['CAC payback', m.payback > 60 ? '—' : m.payback.toFixed(1) + ' mo'], ['Logo churn', pct(m.churn) + '/mo'], ['NRR (annualised)', Math.round(m.nrr * 100) + '%']].map(function (r) { return '<div><span class="k">' + r[0] + '</span><span class="v">' + r[1] + '</span></div>'; }).join('') + '</div></section>' +
       '<section class="card"><div class="ch"><span class="eyebrow">Pricing</span><span class="mono" style="font-size:12px">INDEX ' + S.price.toFixed(2) + '</span></div><div class="cb" style="display:flex;flex-direction:column;gap:10px"><p class="note">Changes apply to all accounts. Raising prices lifts revenue but triggers churn for two months.</p><div style="display:flex;gap:8px;flex-wrap:wrap">' +
       btn('Raise 10%', 'price', { dir: 'up' }, { cls: 'sm', cost: { str: 1 }, disabled: !afford({ str: 1 }) || S.flags.priceMonth === S.month }) + btn('Cut 10%', 'price', { dir: 'down' }, { cls: 'sm', cost: { str: 1 }, disabled: !afford({ str: 1 }) || S.flags.priceMonth === S.month }) + '</div></div></section>' +
       '<section class="card"><div class="ch"><span class="eyebrow">Venture debt</span></div><div class="cb" style="display:flex;flex-direction:column;gap:10px"><p class="note">' + debtTxt + '</p>' + (S.vdebt.taken ? '' : btn('Draw ₹1.5 Cr', 'vdebt', {}, { cls: 'sm ghost', cost: { str: 1 }, disabled: !afford({ str: 1 }) })) + '</div></section>' +
       '</aside></div>';
   }
 
+  var CATC = { Fit: 'acc', Retention: 'up', Growth: 'up', Monetisation: 'acc', Enterprise: 'mut', Platform: 'mut', Security: 'mut', Custom: 'down', Partner: 'mut' };
+  var bfilter = 'All';
   function vProduct(m) {
-    var e = m.eng, P = S.product, I = FS.ITEMS;
+    var e = m.eng, P = S.product;
     var bugs = Math.round(3 + P.debt * 0.22), fit = P.pmf >= 0.68 ? ['Strong', 'up'] : P.pmf >= 0.58 ? ['Good', 'up'] : P.pmf >= 0.5 ? ['Lukewarm', 'acc'] : ['Weak', 'down'];
     var fw = Math.max(0.1, e.feature), cum = 0;
+    function chips(it) { return '<span class="pill ' + (CATC[it.cat] || '') + '">' + esc(it.cat.toUpperCase()) + '</span>'; }
     var q = P.queue.map(function (id, i) {
-      var it = I[id], done = P.progress[id] || 0, left = it.effort - done; cum += left;
-      var eta = Math.ceil(cum / fw);
-      return '<div class="qitem"><span class="n">' + mm(i + 1) + '</span><div style="display:flex;flex-direction:column;gap:6px;min-width:0"><div style="display:flex;justify-content:space-between;gap:10px"><span class="t">' + esc(it.name) + '</span><span class="mono mut" style="font-size:11px;white-space:nowrap">' + Math.round(done) + ' / ' + it.effort + ' WKS · ETA ' + (eta <= 1 ? 'THIS MONTH' : eta + ' MO') + '</span></div><div class="bar"><i style="width:' + (done / it.effort * 100) + '%"></i></div><span class="w">' + esc(it.why) + ' <span class="faint">Ships: ' + esc(it.ship) + '</span></span></div>' +
+      var it = FS.item(S, id); if (!it) return '';
+      var done = P.progress[id] || 0, left = it.effort - done; cum += left;
+      var eta = Math.ceil(cum / fw), est = FS.itemEstimate(S, id);
+      return '<div class="qitem"><span class="n">' + mm(i + 1) + '</span><div style="display:flex;flex-direction:column;gap:6px;min-width:0"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><span class="t">' + esc(it.name) + ' ' + chips(it) + '</span><span class="mono mut" style="font-size:11px;white-space:nowrap">' + Math.round(done) + ' / ' + it.effort + ' WKS · ETA ' + (eta <= 1 ? 'THIS MONTH' : eta + ' MO') + '</span></div><div class="bar"><i style="width:' + (done / it.effort * 100) + '%"></i></div><span class="w">' + esc(it.why) + '</span><span class="w acc">Expected: ' + esc(est.text) + (est.conf !== 'Fixed' ? ' <span class="faint">· confidence ' + est.conf.toLowerCase() + '</span>' : '') + '</span></div>' +
         '<div class="acts"><button class="icon" type="button" data-act="q" data-op="up" data-id="' + id + '" aria-label="Move ' + esc(it.name) + ' up"' + (i === 0 ? ' disabled' : '') + '>↑</button><button class="icon" type="button" data-act="q" data-op="down" data-id="' + id + '" aria-label="Move ' + esc(it.name) + ' down"' + (i === P.queue.length - 1 ? ' disabled' : '') + '>↓</button><button class="icon" type="button" data-act="q" data-op="remove" data-id="' + id + '" aria-label="Remove ' + esc(it.name) + ' from queue">×</button></div></div>';
     }).join('');
-    var b = P.backlog.map(function (id) { var it = I[id]; return '<div class="qitem" style="grid-template-columns:minmax(0,1fr) auto"><div style="display:flex;flex-direction:column;gap:3px;min-width:0"><span class="t">' + esc(it.name) + ' <span class="mono faint" style="font-size:11px;font-weight:400">' + it.effort + ' WKS' + (P.progress[id] ? ' · ' + Math.round(P.progress[id]) + ' DONE' : '') + '</span></span><span class="w">' + esc(it.why) + '</span></div>' + btn('Add to queue', 'q', { op: 'add', id: id }, { cls: 'sm' }) + '</div>'; }).join('');
-    var tot = e.raw || 1;
+    var cats = ['All'].concat(P.backlog.map(function (id) { var it = FS.item(S, id); return it ? it.cat : ''; }).filter(function (c, i, a) { return c && a.indexOf(c) === i; }));
+    if (cats.indexOf(bfilter) < 0) bfilter = 'All';
+    var b = P.backlog.map(function (id) {
+      var it = FS.item(S, id); if (!it || (bfilter !== 'All' && it.cat !== bfilter)) return '';
+      var est = FS.itemEstimate(S, id);
+      return '<div class="qitem" style="grid-template-columns:minmax(0,1fr) auto"><div style="display:flex;flex-direction:column;gap:4px;min-width:0"><span class="t">' + esc(it.name) + ' ' + chips(it) + ' <span class="mono faint" style="font-size:11px;font-weight:400">' + it.effort + ' WKS' + (P.progress[id] ? ' · ' + Math.round(P.progress[id]) + ' DONE' : '') + '</span></span><span class="w">' + esc(it.why) + ' <span class="faint">Source: ' + esc(it.src || '—') + '.</span></span><span class="w acc">Expected: ' + esc(est.text) + '</span></div>' + btn('Add to queue', 'q', { op: 'add', id: id }, { cls: 'sm' }) + '</div>';
+    }).join('');
+    var launch = FS.launchable(S).map(function (id) {
+      var it = FS.item(S, id);
+      return '<div class="lrow" style="flex-wrap:wrap;padding:10px 16px"><span class="k" style="flex:1;min-width:140px">' + esc(it.name) + '</span><span class="lbtns">' + FS.LAUNCH.map(function (T, i) { return btn(['Small ₹1L', 'Medium ₹4L', 'Big ₹10L'][i], 'do', { a: 'launch', p: JSON.stringify({ id: id, tier: i }) }, { cls: 'sm', disabled: !afford(T.cost), title: T.name + ' · ' + costTxt(T.cost) }); }).join('') + '</span></div>';
+    }).join('');
     return '<div class="head"><div><div class="eyebrow acc">Product</div><h1>' + (P.debt > 60 ? 'Tech debt now eats <span class="em">' + Math.round(e.bugTax * 100) + '% of every sprint.</span>' : 'The team ships <span class="em">' + e.feature.toFixed(0) + ' eng-weeks a month.</span>') + '</h1></div></div>' +
       '<div class="kpis">' +
-      [['CAPACITY', e.raw.toFixed(0) + ' wks', e.ics + ' ENGINEERS + CTO', 'mut'], ['TO FEATURES', e.feature.toFixed(1) + ' wks', 'AFTER BUGS AND DEBT WORK', 'acc'], ['BUGS / WEEK', String(bugs), 'RISES WITH TECH DEBT', bugs > 14 ? 'down' : 'mut'], ['PRODUCTIVITY', Math.round(e.prod * 100) + '%', e.span < 1 ? 'CTO SPAN TOO WIDE' : 'DEBT, MORALE, SPAN', e.prod < 0.7 ? 'down' : 'mut'], ['FIT SIGNAL', fit[0], 'FROM CHURN AND REFERRALS', fit[1]]]
+      [['CAPACITY', e.raw.toFixed(0) + ' wks', e.ics + ' ENGINEERS + CTO', 'mut'], ['TO FEATURES', e.feature.toFixed(1) + ' wks', e.maint > 0.05 ? e.maint.toFixed(1) + ' WKS ON CUSTOM UPKEEP' : 'AFTER BUGS AND DEBT WORK', e.maint > 2 ? 'down' : 'acc'], ['BUGS / WEEK', String(bugs), 'RISES WITH TECH DEBT', bugs > 14 ? 'down' : 'mut'], ['PRODUCTIVITY', Math.round(e.prod * 100) + '%', e.span < 1 ? 'CTO SPAN TOO WIDE' : 'DEBT, MORALE, SPAN', e.prod < 0.7 ? 'down' : 'mut'], ['FIT SIGNAL', fit[0], 'ERODES ~0.25 PTS A MONTH', fit[1]]]
         .map(function (k) { return '<div class="kpi"><span class="eyebrow">' + k[0] + '</span><span class="v">' + esc(k[1]) + '</span><span class="n ' + k[3] + '">' + esc(k[2]) + '</span></div>'; }).join('') + '</div>' +
       '<div class="grid gside"><div class="grid" style="align-content:start">' +
       '<section class="card"><div class="ch"><span class="eyebrow">Roadmap queue · engineers work top-down</span><span class="mono faint" style="font-size:10px">' + P.queue.length + ' ITEMS</span></div>' + (q || '<p class="cb note down">The queue is empty. Engineers will sit idle; add something from the backlog.</p>') + '</section>' +
-      '<section class="card"><div class="ch"><span class="eyebrow">Backlog</span></div>' + (b || '<p class="cb note">Everything is queued or shipped.</p>') + '</section>' +
+      '<section class="card"><div class="ch"><span class="eyebrow">Backlog · new ideas arrive as the product matures</span><span class="mono faint" style="font-size:10px">' + P.backlog.length + ' IDEAS</span></div>' +
+      '<div class="cb" style="padding-bottom:0"><div class="seg" role="group" aria-label="Filter backlog">' + cats.map(function (c) { return '<button type="button" data-act="bfilter" data-v="' + esc(c) + '" aria-pressed="' + (bfilter === c) + '">' + esc(c) + '</button>'; }).join('') + '</div></div>' +
+      (b || '<p class="cb note">Nothing in this category. New ideas arrive every month.</p>') + '</section>' +
       '</div><aside class="grid" style="align-content:start">' +
       '<section class="card hl"><div class="ch"><span class="eyebrow acc">Debt allocation</span><span class="mono" style="font-size:12px">' + P.alloc + '% TO DEBT</span></div><div class="cb" style="display:flex;flex-direction:column;gap:12px">' +
       '<div class="seg" role="group" aria-label="Share of capacity to tech debt">' + [0, 10, 20, 30, 40, 50].map(function (v) { return '<button type="button" data-act="alloc" data-v="' + v + '" aria-pressed="' + (P.alloc === v) + '">' + v + '%</button>'; }).join('') + '</div>' +
       '<div class="stack" role="img" aria-label="Capacity split"><i style="width:' + (e.bugTax * 100) + '%;background:#E08B7C"></i><i style="width:' + ((1 - e.bugTax) * (1 - P.alloc / 100) * 100) + '%;background:#C9A45C"></i><i style="width:' + ((1 - e.bugTax) * P.alloc) + '%;background:#8E959E"></i></div>' +
-      '<p class="note"><span class="down">■</span> Bugs ' + Math.round(e.bugTax * 100) + '% &nbsp; <span class="acc">■</span> Features &nbsp; <span class="mut">■</span> Debt. Debt work lowers future bug load; too little and the bug tax compounds.</p>' + (S.flags.sprintUntil ? '<p class="note acc">A debt sprint is running until month ' + S.flags.sprintUntil + '.</p>' : '') + '</div></section>' +
-      '<section class="card"><div class="ch"><span class="eyebrow">Shipped</span></div><div class="cb" style="display:flex;flex-wrap:wrap;gap:6px">' + (P.shipped.length ? P.shipped.map(function (id) { return '<span class="pill up">' + esc(I[id].name) + '</span>'; }).join('') : '<span class="note">Nothing yet.</span>') + '</div></section>' +
+      '<p class="note"><span class="down">■</span> Bugs ' + Math.round(e.bugTax * 100) + '% &nbsp; <span class="acc">■</span> Features &nbsp; <span class="mut">■</span> Debt. Debt work lowers future bug load; too little and the bug tax compounds.' + (P.maint > 0 ? ' Custom enterprise work also costs ' + P.maint.toFixed(1) + ' eng-weeks of upkeep every month.' : '') + '</p>' + (S.flags.sprintUntil ? '<p class="note acc">A debt sprint is running until month ' + S.flags.sprintUntil + '.</p>' : '') + '</div></section>' +
+      '<section class="card"><div class="ch"><span class="eyebrow">Launch what you shipped</span><span class="mono faint" style="font-size:10px">−1 STR EACH</span></div>' + (launch || '<p class="cb note">Features shipped in the last three months can be launched to create a burst of leads. Size the launch to the feature.</p>') + '</section>' +
+      '<section class="card"><div class="ch"><span class="eyebrow">How estimates work</span></div><p class="cb note">Expected impact is a guess until a feature ships. A Product Manager narrows the guess and lifts real impact; a Data Analyst sharpens it further. Gains shrink as fit approaches its ceiling, and rivals erode fit every month.</p></section>' +
+      '<section class="card"><div class="ch"><span class="eyebrow">Shipped</span><span class="mono faint" style="font-size:10px">' + P.shipped.length + '</span></div><div class="cb" style="display:flex;flex-wrap:wrap;gap:6px">' + (P.shipped.length ? P.shipped.slice().reverse().slice(0, 24).map(function (id) { var it = FS.item(S, id); return '<span class="pill up" title="' + esc(it.realised ? 'Impact ×' + it.realised : '') + '">' + esc(it.name) + '</span>'; }).join('') : '<span class="note">Nothing yet.</span>') + '</div></section>' +
       '</aside></div>';
   }
 
-  var FN = [['exec', 'Leadership'], ['eng', 'Engineering'], ['sales', 'Sales'], ['cs', 'Customer success'], ['mkt', 'Marketing'], ['ops', 'Operations']];
+  var FN = [['exec', 'Leadership'], ['eng', 'Engineering'], ['product', 'Product'], ['sales', 'Sales'], ['cs', 'Customer success'], ['mkt', 'Marketing'], ['ops', 'Operations and G&A']];
   function vTeam(m) {
     var list = FN.map(function (f) {
       var ps = S.people.filter(function (p) { return p.fn === f[0] || (f[0] === 'exec' && p.id === 'you'); });
@@ -252,9 +291,13 @@
         btn('Let go (1 month severance)', 'fire', { id: p.id }, { cost: { ppl: 1 }, disabled: !afford({ ppl: 1 }) }) +
         '</div></div></section>';
     } else detail = '<section class="card"><div class="cb note">Select a person to see their pay, morale and performance, and to act on it. People with morale below 45 are likely to quit.</div></section>';
-    var roles = [['ae', 'Account Executive'], ['csm', 'Customer Success'], ['eng', 'Engineer'], ['seng', 'Senior Engineer'], ['em', 'Engineering Manager'], ['hos', 'Head of Sales'], ['mkt', 'Growth Marketer']].map(function (r) {
-      var R = FS.ROLES[r[0]], dis = !afford({ ppl: 1 }) || (r[0] === 'hos' && (S.people.some(function (x) { return x.role === 'hos'; }) || S.pipeline.some(function (x) { return x.role === 'hos'; })));
-      return '<button type="button" class="roleb" data-act="cands" data-role="' + r[0] + '"' + (dis ? ' disabled' : '') + '><span class="t">' + r[1] + '</span><span class="s">~₹' + R.salary + 'L/YR · −1 PPL</span></button>';
+    var RG = [['Sales', ['se', 'ae', 'sdr', 'hos']], ['Marketing', ['mkt', 'perf', 'pmm']], ['Product and engineering', ['eng', 'seng', 'em', 'pm', 'designer', 'data', 'sre', 'sec']], ['Customers', ['csm', 'support', 'solutions']], ['Operations', ['fin', 'recruiter', 'partner']]];
+    var roles = RG.map(function (g) {
+      return '<div class="fnh" style="grid-column:1/-1;margin:4px -16px 0">' + g[0].toUpperCase() + '</div>' + g[1].map(function (rid) {
+        var R = FS.ROLES[rid], dis = !afford({ ppl: 1 }) || (rid === 'hos' && (S.people.some(function (x) { return x.role === 'hos'; }) || S.pipeline.some(function (x) { return x.role === 'hos'; })));
+        var n = S.people.filter(function (x) { return x.role === rid; }).length;
+        return '<button type="button" class="roleb" data-act="cands" data-role="' + rid + '"' + (dis ? ' disabled' : '') + '><span class="t">' + R.title + (n ? ' <span class="faint mono" style="font-size:10px">×' + n + '</span>' : '') + '</span><span class="s">~₹' + R.salary + 'L/YR · −1 PPL</span><span class="note" style="font-size:11px">' + esc(R.what) + '</span></button>';
+      }).join('');
     }).join('');
     var e = m.eng;
     return '<div class="head"><div><div class="eyebrow acc">Team &amp; Org</div><h1>' + m.headcount + ' people. <span class="em">Payroll ' + L(m.payroll) + ' a month.</span></h1></div></div>' +
@@ -307,15 +350,17 @@
   function renderMain() {
     var m = FS.metrics(S);
     renderTop(m); renderNav(m);
-    var html = { overview: vOverview, finance: vFinance, product: vProduct, team: vTeam, capital: vCapital }[view](m);
+    var fn = VIEWFN[view] || VIEWFN.overview;
+    var html = fn(m);
     $('main').innerHTML = html;
   }
   function render() { if (S) renderMain(); }
+  var VIEWFN = { overview: function (m) { return vOverview(m); }, finance: function (m) { return vFinance(m); }, product: function (m) { return vProduct(m); }, team: function (m) { return vTeam(m); }, capital: function (m) { return vCapital(m); } };
 
   /* ---------- modals ---------- */
   function openModal(html, opts) {
     opts = opts || {};
-    $('modalRoot').innerHTML = '<div class="overlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="mt"' + (opts.wide ? ' style="width:min(1040px,100%)"' : '') + '>' + html + '</div></div>';
+    $('modalRoot').innerHTML = '<div class="overlay"><div class="modal' + (opts.crisis ? ' crisis' : '') + '" role="dialog" aria-modal="true" aria-labelledby="mt"' + (opts.wide ? ' style="width:min(1040px,100%)"' : '') + '>' + html + '</div></div>';
     var f = $('modalRoot').querySelector('[data-autofocus]') || $('modalRoot').querySelector('button');
     if (f) f.focus();
   }
@@ -332,14 +377,14 @@
     if (!ev) return next();
     picked = null;
     var draw = function () {
-      openModal('<div class="mh"><span class="eyebrow acc">Event · month ' + mm(S.month) + ' · ' + esc(ev.tag) + '</span><span class="eyebrow">Decide before the month ends</span></div><div class="mb">' +
+      openModal('<div class="mh"><span class="eyebrow ' + (ev.crisis ? 'down' : 'acc') + '">' + (ev.crisis ? '⚠ ' : 'Event · ') + esc(ev.tag) + ' · month ' + mm(S.month) + '</span><span class="eyebrow">' + (ev.crisis ? 'Respond now' : 'Decide before the month ends') + '</span></div><div class="mb">' +
         '<h2 id="mt">' + esc(ev.title) + '</h2><p class="lede">' + esc(ev.body) + '</p>' +
         (ev.quotes.length ? '<div class="grid ' + (ev.quotes.length > 1 ? 'g2' : '') + '">' + ev.quotes.map(function (q) { return '<figure class="quote" style="margin:0"><q>' + esc(q[0]) + '</q><cite>' + esc(q[1]).toUpperCase() + '</cite></figure>'; }).join('') + '</div>' : '') +
         '<div role="radiogroup" aria-label="Your response" style="display:flex;flex-direction:column;gap:8px">' + ev.choices.map(function (c, i) {
           var ok = afford(c.cost);
           return '<button type="button" class="choice" role="radio" aria-checked="' + (picked === i) + '" data-act="pick" data-i="' + i + '"' + (ok ? '' : ' disabled') + '><span class="lt">' + 'ABC'[i] + '</span><span><span class="t">' + esc(c.label) + '</span><span class="e" style="display:block">' + esc(c.effect) + (ok ? '' : ' · NOT ENOUGH FOCUS') + '</span></span><span class="mono acc" style="font-size:11px">' + esc(costTxt(c.cost) || 'FREE') + '</span></button>';
         }).join('') + '</div>' +
-        '<div class="mf"><span class="mono faint" style="font-size:10px">SOME OPTIONS HAVE EFFECTS YOU WILL ONLY SEE LATER</span>' + btn(picked == null ? 'Pick an option' : 'Decide · option ' + 'ABC'[picked], 'decide', {}, { cls: 'primary lg', disabled: picked == null }) + '</div></div>');
+        '<div class="mf"><span class="mono faint" style="font-size:10px">SOME OPTIONS HAVE EFFECTS YOU WILL ONLY SEE LATER</span>' + btn(picked == null ? 'Pick an option' : 'Decide · option ' + 'ABC'[picked], 'decide', {}, { cls: 'primary lg', disabled: picked == null }) + '</div></div>', { crisis: ev.crisis });
     };
     eventModal.draw = draw; draw();
   }
@@ -353,12 +398,13 @@
     rep.quit.forEach(function (x) { items.push(['QUIT', x, 'down']); });
     rep.notes.forEach(function (x) { items.push(['NOTE', x, 'acc']); });
     (rep.news || []).forEach(function (x) { if (!/^Shipped:/.test(x) && !/resigned/.test(x)) items.push(['NEWS', x, 'mut']); });
+    (rep.goals || []).forEach(function (x) { items.unshift(['MILESTONE', x, 'up']); });
     if (rep.termsheet) items.push(['CAPITAL', 'A term sheet has arrived. Review it in Capital & Board.', 'up']);
     openModal('<div class="mh"><span class="eyebrow acc">Month ' + mm(rep.m) + ' report</span><span class="eyebrow">' + (36 - rep.m) + ' months left</span></div><div class="mb">' +
       '<h2 id="mt">' + (dm >= 0 ? 'MRR up ' + L(dm, 2) + '.' : 'MRR down ' + L(-dm, 2) + '.') + ' <span class="em">' + (m.runway < 6 ? rw(m.runway) + ' of runway left.' : 'Cash ' + (dc >= 0 ? 'up ' : 'down ') + L(Math.abs(dc)) + '.') + '</span></h2>' +
       '<div class="statrow">' + [['NEW CUSTOMERS', '+' + rep.newCust], ['CHURNED', '−' + rep.churned], ['MRR', L(rep.mrr1, 2)], ['CASH', L(rep.cash1)]].map(function (x) { return '<div><span class="l">' + x[0] + '</span><span class="v">' + x[1] + '</span></div>'; }).join('') + '</div>' +
       (items.length ? '<div style="border:1px solid var(--line2)">' + items.map(function (x) { return '<div class="alert"><span class="lv ' + x[2] + '">' + x[0] + '</span><span>' + esc(x[1]) + '</span></div>'; }).join('') + '</div>' : '<p class="note">A quiet month.</p>') +
-      '<div class="mf"><span></span>' + btn('Continue', 'next', {}, { cls: 'primary lg' }) + '</div></div>');
+      '<div class="mf">' + btn('Open the full reports', 'nextReports', {}, { cls: 'sm' }) + btn('Continue', 'next', {}, { cls: 'primary lg' }) + '</div></div>');
   }
 
   function boardModal(b) {
@@ -366,6 +412,8 @@
       '<h2 id="mt">The board wants answers.</h2>' +
       '<div class="statrow">' + [['GROWTH (3-MO)', pct(b.g3) + '/mo'], ['RUNWAY', rw(b.runway)], ['BURN MULTIPLE', b.bm > 50 ? '—' : b.bm.toFixed(1) + '×'], ['CONFIDENCE', Math.round(S.board)]].map(function (x) { return '<div><span class="l">' + x[0] + '</span><span class="v">' + x[1] + '</span></div>'; }).join('') + '</div>' +
       '<div><div class="eyebrow" style="margin-bottom:8px">Their asks</div>' + b.asks.map(function (a) { return '<div class="alert" style="border:1px solid var(--line);border-bottom:0"><span class="lv acc">ASK</span><span>' + esc(a) + '</span></div>'; }).join('') + '<div style="border-top:1px solid var(--line)"></div></div>' +
+      (b.review ? '<div><div class="eyebrow" style="margin-bottom:8px">Last quarter\'s targets</div>' + b.review.map(function (r) { return '<div class="alert" style="border:1px solid var(--line);border-bottom:0"><span class="lv ' + (r.ok ? 'up' : 'down') + '">' + (r.ok ? 'HIT' : 'MISS') + '</span><span>' + esc(r.label) + (r.ok ? ' · confidence +3' : ' · confidence −2') + '</span></div>'; }).join('') + '<div style="border-top:1px solid var(--line)"></div></div>' : '') +
+      (b.okrs ? '<div><div class="eyebrow" style="margin-bottom:8px">Targets for next quarter</div>' + b.okrs.map(function (o) { return '<div class="alert" style="border:1px solid var(--line);border-bottom:0"><span class="lv acc">OKR</span><span>' + esc(o) + '</span></div>'; }).join('') + '<div style="border-top:1px solid var(--line)"></div></div>' : '') +
       '<p class="lede">How do you present the quarter?</p>' +
       '<button type="button" class="choice" data-act="board" data-c="candid"><span class="lt">A</span><span><span class="t">Candid update: here is what is working and what is not</span><span class="e" style="display:block">SMALL CONFIDENCE GAIN IF GROWTH IS ON PLAN</span></span><span></span></button>' +
       '<button type="button" class="choice" data-act="board" data-c="spin"><span class="lt">B</span><span><span class="t">Lead with the wins and keep the misses vague</span><span class="e" style="display:block">CONFIDENCE +6 NOW</span></span><span></span></button></div>');
@@ -380,7 +428,7 @@
   function candModal(role) {
     var r = FS.act(S, 'candidates', { role: role }); save();
     var R = FS.ROLES[role];
-    var fee = function (c) { return Math.round(c.salary * 0.12 * FS.ARCH[S.archetype].fee * 10) / 10; };
+    var fee = function (c) { return FS.hireFee(S, c); };
     openModal('<div class="mh"><span class="eyebrow acc">Hiring · ' + esc(R.title) + '</span><button class="btn sm" type="button" data-act="close">Close</button></div><div class="mb"><h2 id="mt">Three candidates made the final round.</h2><p class="lede">They join next month and ramp at half productivity for one or two months.</p>' +
       r.list.map(function (c, i) {
         var lvl = c.skill >= R.skill[0] + (R.skill[1] - R.skill[0]) * 0.66 ? 'Exceptional' : c.skill >= R.skill[0] + (R.skill[1] - R.skill[0]) * 0.33 ? 'Strong' : 'Promising';
@@ -407,8 +455,10 @@
       '<div class="mf"><span class="note">Tip: the agenda on the Overview flags what needs attention.</span>' + btn(first ? 'Start month 1' : 'Back to the game', 'close', {}, { cls: 'primary lg' }) + '</div></div>');
   }
 
+  function track() { try { if (window.FSAuth && S) window.FSAuth.trackGame(S, S.over ? FS.score(S) : null); } catch (e) { } }
   function debrief() {
     var sc = FS.score(S), m = FS.metrics(S);
+    track();
     var titles = { completed: 'You made it to month 36.', dead: 'You ran out of cash in month ' + S.month + '.', fired: 'The board replaced you in month ' + S.month + '.', acquired: 'You sold to Stackline in month ' + S.month + '.', cofounder: 'Your co-founder walked out in month ' + S.month + '.' };
     var sorted = S.log.slice().sort(function (a, b) { return b.q - a.q; });
     var best = sorted.slice(0, 3), worst = sorted.slice(-3).reverse();
@@ -420,7 +470,7 @@
     openModal('<div class="mh"><span class="eyebrow acc">Debrief · seed ' + S.seed + ' · ' + esc(FS.ARCH[S.archetype].name) + '</span><span class="eyebrow">' + sc.months + ' months played</span></div><div class="mb">' +
       '<h2 id="mt">' + esc(titles[S.outcome] || 'Game over.') + '</h2>' +
       '<div class="statrow"><div><span class="l">FOUNDER OUTCOME</span><span class="v serif" style="font-size:34px">₹' + sc.founderOutcome.toFixed(1) + ' Cr</span></div><div><span class="l">COMPANY VALUE</span><span class="v">₹' + sc.ev.toFixed(1) + ' Cr</span></div><div><span class="l">YOUR OWNERSHIP</span><span class="v">' + sc.ownership.toFixed(1) + '%</span></div><div><span class="l">FINAL ARR</span><span class="v">' + L(m.arr) + '</span></div></div>' +
-      '<div class="statrow">' + [['DECISION QUALITY', sc.dqGrade + ' · ' + Math.round(sc.dq)], ['CAPITAL EFFICIENCY', sc.effGrade + ' · ' + sc.eff.toFixed(2) + '×'], ['TEAM HEALTH', sc.teamGrade + ' · ' + Math.round(sc.team)], ['REPUTATION', sc.repGrade + ' · ' + Math.round(sc.rep)]].map(function (x) { return '<div><span class="l">' + x[0] + '</span><span class="v">' + x[1] + '</span></div>'; }).join('') + '</div>' +
+      '<div class="statrow s5">' + [['MILESTONES', sc.goals + ' / ' + sc.goalsTotal], ['DECISION QUALITY', sc.dqGrade + ' · ' + Math.round(sc.dq)], ['CAPITAL EFFICIENCY', sc.effGrade + ' · ' + sc.eff.toFixed(2) + '×'], ['TEAM HEALTH', sc.teamGrade + ' · ' + Math.round(sc.team)], ['REPUTATION', sc.repGrade + ' · ' + Math.round(sc.rep)]].map(function (x) { return '<div><span class="l">' + x[0] + '</span><span class="v">' + x[1] + '</span></div>'; }).join('') + '</div>' +
       '<p class="lede">' + luck + '</p>' +
       '<div class="grid g2"><div class="card"><div class="ch"><span class="eyebrow">MRR · ₹ lakh</span></div><div class="cb">' + lineChart([{ pts: S.history.map(function (h) { return [h.m, h.mrr]; }), color: '#C9A45C', dot: true }], { h: 150, label: 'MRR over the game' }) + '</div></div>' +
       '<div class="card"><div class="ch"><span class="eyebrow">Cash · ₹ Cr</span></div><div class="cb">' + lineChart([{ pts: S.history.map(function (h) { return [h.m, Math.max(0, h.cash) / 100]; }), color: '#ECE6DA', dot: true }], { h: 150, fmt: function (v) { return v.toFixed(1); }, label: 'Cash over the game' }) + '</div></div></div>' +
@@ -458,8 +508,10 @@
     var seed = parseInt(String(seedStr || '').replace(/\D/g, ''), 10);
     if (!seed) seed = Math.floor(Math.random() * 900000) + 100000;
     S = FS.newGame({ seed: seed, archetype: pickedArch });
+    S.clientId = seed + '-' + Date.now().toString(36);
     view = 'overview'; selPerson = null;
     save(); showApp(); helpModal(true);
+    track();
   }
   function showApp() { $('start').hidden = true; $('app').hidden = false; render(); if (S.pending.length) { modalQ = []; eventModal(); } }
 
@@ -469,7 +521,7 @@
     var rep = FS.endMonth(S);
     if (!rep) return;
     if (rep.blocked) { toast(rep.blocked, true); return; }
-    save();
+    save(); track();
     var q = [function () { reportModal(rep); }];
     if (rep.boardMeeting) q.push(function () { boardModal(rep.boardMeeting); });
     if (rep.emergency) q.push(emergencyModal);
@@ -486,7 +538,9 @@
   }
   var H = {
     view: function (d) { view = d.v; selPerson = view === 'team' ? selPerson : null; render(); $('main').scrollTop = 0; },
-    mkt: function (d) { doAct('setMarketing', { value: S.marketing + Number(d.d) }); },
+    'do': function (d) { var p = {}; try { p = d.p ? JSON.parse(d.p) : {}; } catch (e) { } if (d.confirm && H['do'].armed !== d.p + d.a) { H['do'].armed = d.p + d.a; toast(d.confirm); return; } H['do'].armed = null; doAct(d.a, p); },
+    bfilter: function (d) { bfilter = d.v; render(); },
+    nextReports: function () { view = 'reports'; next(); },
     price: function (d) { doAct('price', { dir: d.dir }); },
     vdebt: function () { doAct('ventureDebt'); },
     bridge: function () { doAct('bridge'); },
@@ -506,7 +560,7 @@
     offsite: function () { doAct('offsite'); },
     rest: function () { doAct('rest'); },
     cands: function (d) { candModal(d.role); },
-    hire: function (d) { var c = candModal.list[Number(d.i)]; closeModal(); doAct('hire', { cand: c }); },
+    hire: function (d) { var c = candModal.list[Number(d.i)]; closeModal(); doAct('hire', { cand: c }); if (modalQ.length || S.pending.length) next(); },
     close: function () { if (modalQ.length || S.pending.length) next(); else closeModal(); render(); },
     next: function () { next(); },
     pick: function (d) { picked = Number(d.i); eventModal.draw(); },
@@ -544,6 +598,10 @@
   });
   $('endMonth').addEventListener('click', function () { if (S && !S.over) endMonth(); });
 
-  startScreen();
-  window.__FS_UI = { get S() { return S; } };
+  window.__FS_UI = {
+    get S() { return S; }, FS: FS, L: L, esc: esc, rw: rw, pct: pct, mm: mm, btn: btn, afford: afford, costTxt: costTxt, lineChart: lineChart, ARROW: ARROW,
+    views: VIEWFN, H: H, render: render, openModal: openModal, closeModal: closeModal, doAct: doAct, toast: toast, save: save,
+    setView: function (v) { view = v; render(); }, startScreen: function () { startScreen(); }
+  };
+  if (window.FSAuth) window.FSAuth.gate(function () { startScreen(); }); else startScreen();
 })();
