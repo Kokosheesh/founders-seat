@@ -1,37 +1,35 @@
 # Founder's Seat
 
-Landing page and waitlist for **Founder's Seat**, a grand-strategy simulation where MBA students, future founders, founder's office and strategy professionals run a startup from a single command dashboard.
+A grand-strategy simulation where MBA students, future founders, founder's office and strategy professionals run a startup from a single command dashboard.
 
-- `index.html`: the landing page with the waitlist and the PLAY NOW button. It's responsive and has no build step.
-- `Code.gs`: a Google Apps Script that appends each waitlist signup to a Google Sheet.
-- `play/`: the playable game (no build step).
-  - `engine.js`: core simulation: cash, customers, team, events, fundraising, scoring.
-  - `systems.js`: growth channels and funnel, A/B experiments, the feature library, operations, partners, enterprise deals, crises, goals, and the P&L, cash-flow and MIS reports.
-  - `auth.js`: player accounts and play tracking through Supabase.
-  - `ui.js` and `ui2.js`: the interface.
-- `admin/`: owner-only stats dashboard (players, logins per day, games).
-- `supabase/schema.sql`: tables, row-level security and the stats function. Run it once in the Supabase SQL editor.
+**Live: https://fintech.pelicanx.in/founders-seat/**. It is served from the `founders-seat/` folder of the `fintech-dashboard` repo, which hosts fintech.pelicanx.in. This repo's GitHub Pages site (kokosheesh.github.io/founders-seat) only redirects there.
 
-## Player accounts and stats
-Players sign up with email and password through Supabase Auth (project `xxdxuuqmftxufvnkkuif`). "Confirm email" is off so a whole class can sign up at once without hitting Supabase's email limits.
+## What's here
+The site itself (landing page, `play/`, `admin/` and the policy pages) now lives in `fintech-dashboard/founders-seat/`, and that copy is the one to edit. This repo's `index.html`, `play/index.html` and `admin/index.html` only redirect there; the older JavaScript files under `play/` are kept for history.
 
-- `players`: one row per account (name, email, college or company, last seen).
-- `logins`: one row per player per day (India time).
-- `games`: one row per game, updated every month played.
-- `daily_stats`: a view with sign-ups, players logged in, games started and finished per day.
+The game is made of these files in `fintech-dashboard/founders-seat/play/`:
+- `engine.js`: core simulation.
+- `systems.js`: growth, experiments, the feature library, ops, partners, deals, crises, goals and reports.
+- `auth.js`: email and Google sign-in, play tracking, the 7-day trial and the ₹269 unlock.
+- `ui.js`, `ui2.js`: the interface.
+- `simple.js`: the Simple view, which keeps only key numbers visible and folds the rest behind a click.
+- `fx.js`: celebration and alert graphics and synthesised sounds, with a mute button.
 
-The dashboard at `/admin/` calls `admin_stats()`, which only returns data to the owner email set in `schema.sql`. The key in `auth.js` is Supabase's publishable key. It is meant to be public, because row-level security limits each player to their own rows.
+This repo keeps the back end:
+- `supabase/schema.sql` then `supabase/v3_paywall.sql`: tables, row-level security, stats, the trial and paywall logic. Run both in the Supabase SQL editor; both are safe to re-run.
+- `supabase/functions/phonepe/index.ts`: edge function for PhonePe checkout. Deploy it with "Verify JWT" off; the secrets it needs are listed at the top of the file.
+- `Code.gs`: the Google Apps Script behind the waitlist form.
 
-## How signups work
-The form POSTs `email`, `role`, `source` (hero or footer form), UTM params, referrer and page to the Apps Script web app. The script writes one row to the `Waitlist` tab and ignores duplicate emails. A hidden honeypot field filters simple bots.
+## Accounts, trial and payments
+- Players sign in with email and password or with Google. "Confirm email" is off, so a class can sign up at once.
+- Every new account gets 7 days of full access. After that, `my_access()` returns `expired` and the game shows the paywall.
+- Paying creates a row in `payments`. The edge function marks it `COMPLETED` only after PhonePe's order-status API confirms the payment and the amount.
+- Emails in `access_grants` skip the paywall (cohort licences, pilots). Manage them from `/admin/`.
+- Price and trial length live in the `app_settings` table.
+- The paywall is enforced in the browser. A technical user could bypass it by editing the game's JavaScript. That is acceptable for a ₹269 game; real enforcement would need the game served from behind a server.
 
-### Setting up the Sheet (one time)
-1. Create a Google Sheet and a new Apps Script project (script.new).
-2. Paste in this repo's `Code.gs`, set `SPREADSHEET_ID` to your Sheet's ID (the long string in its URL), and save.
-3. Go to **Deploy → New deployment → Web app**. Set *Execute as: Me* and *Who has access: Anyone*, then authorise.
-4. Copy the `/exec` URL into `WAITLIST_ENDPOINT` near the bottom of `index.html` and commit.
+## Stats
+`/admin/` shows sign-ups, logins per day, games, paid players, revenue and free-access emails. Only the owner email in `app_settings` can load it.
 
-If you edit the script later, use **Deploy → Manage deployments → Edit → New version** so the URL stays the same.
-
-## Hosting
-GitHub Pages serves from `main` / root. To use a custom domain, add a `CNAME` file and point DNS at GitHub Pages.
+## Waitlist
+The landing page form posts to the Apps Script web app, which writes to the `Waitlist` tab of the Sheet. See `Code.gs`.
